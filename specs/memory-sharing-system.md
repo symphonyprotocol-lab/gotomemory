@@ -931,6 +931,7 @@ Memory:
 认证机制（MVP 钉死一种，避免实现期发散）：
 
 - 终端用户与浏览器扩展：OAuth 2.0 + PKCE 获取短期访问令牌，令牌携带 `tenant_id` 与权限 scope。
+- CLI 与 skill 底层：OAuth 2.0 设备授权流（device flow）登录，或注入租户级 API token；凭证存系统钥匙串或受限配置文件（见 16.5.3）。
 - 服务端 / SDK / MCP Server：租户级 API token（前缀可识别、可独立吊销、可绑定 `client_id` 与允许的 action scope）。
 - 请求签名：对服务端调用使用 HMAC 签名（密钥随 API token 下发）覆盖 method、path、body 摘要和时间戳，防重放（时间戳 + nonce）。Gateway 校验签名后再做粗粒度授权。
 - 所有令牌都解析出 `tenant_id`、`subject_id`、`subject_type` 和 client 信任级别，作为策略求值（8.3）的输入。
@@ -1173,6 +1174,48 @@ New memory candidate
 - 系统钥匙串保存密钥。
 - 可选远端同步。
 
+### 16.5 CLI 命令行客户端
+
+一个名为 `gotomemory` 的命令行工具，是 Gateway API 的薄客户端（通过 SDK 实现），不内嵌 Orchestrator、存储或密钥逻辑。所有请求仍经 Gateway，受同一套认证、策略、审计和脱敏约束，CLI 实例以独立 `client_id` 标识。
+
+适用场景：
+
+- 终端用户在 shell 中创建、检索、管理记忆。
+- CI、脚本和自动化任务。
+- **作为 skill 的底层执行层**：任何支持调用子进程的 skill 框架（如 Agent skills、Claude Code skills）都可以 shell out 到本 CLI，从而接入记忆控制面，而无需各自实现 MCP 或 SDK 集成。CLI 把「受治理的记忆访问」收敛成一个稳定的进程接口。
+
+命令（映射第 9 节 API）：
+
+- `gotomemory memory create | search | read | list | delete`
+- `gotomemory context build | confirm`
+- `gotomemory policy <...>`
+- `gotomemory import | export`
+- `gotomemory login | logout | config`
+
+#### 16.5.1 作为 skill 底层的稳定契约
+
+为了能被 skill 可靠地以子进程调用，CLI 必须提供机器友好的契约：
+
+- `--json`：机器可读输出，结构与对应 API 响应一致；搜索/预览不含 `content`，决策对象不含正文与 embedding 原文。
+- 稳定退出码：`0` 成功；非 0 区分认证失败、策略拒绝、需确认、版本冲突、限流等，与第 9.8 节错误码一一对应。
+- 非交互模式 `--no-input`：不弹交互提示；遇到需确认的记忆时，以特定退出码 + JSON（含 `confirmation_token` 和脱敏预览）返回，交由调用方或用户决定，而不是静默注入或挂起。
+- 必须显式传 `--platform`、`--client-id`、`--purpose`，或从配置/凭证推导（`context build` 必需，见 9.3）。
+- stdin/stdout 流式：记忆 `content` 可从 stdin 读入，便于管道与避免在命令行参数中暴露敏感文本。
+
+#### 16.5.2 skill 集成模式
+
+- 召回：skill 在任务前调用 `gotomemory context build --task "<任务>" --platform claude --purpose context_build --json`，得到 `context`、`memory_ids`、`decision_id`，注入对话；`omitted` 与 `requires_confirmation` 透传给用户。
+- 写入：用户表达偏好后，skill 调用 `gotomemory memory create --type preference --scope personal --json`（`content` 走 stdin）。
+- 确认：需确认时 CLI 返回 token，skill 提示用户后再调用 `gotomemory context confirm --token <...>` 完成注入（见 9.3.1）。
+
+#### 16.5.3 安全约束
+
+- 不得绕过 Gateway 直连存储（见第 6 节架构）。
+- 默认不在终端或日志回显 `private`/`secret` 正文；`--json` 同样遵守搜索不返回 `content`、决策不含正文。
+- 认证用 OAuth 2.0 设备授权流（device flow）或租户级 API token；凭证优先存系统钥匙串，降级到权限受限的配置文件（`0600`）。
+- 作为 skill 底层时每次调用仍写审计，`client_id` 标记为对应 skill 运行环境，保持「谁、为什么、注入了哪些记忆」可追踪。
+- `secret` 记忆默认 `manual_only`，即使在 `--no-input` 或 `--yes` 下也不自动注入。
+
 ## 17. 平台兼容性
 
 | 平台 | 推荐接入 | 记忆读取 | 记忆写入 | 上下文注入 |
@@ -1184,6 +1227,7 @@ New memory candidate
 | Claude Web | 浏览器扩展 | 支持受限 | 用户确认后支持 | 输入框插入 |
 | Gemini API | Gateway + Adapter | 支持 | 支持 | `systemInstruction` + `contents` 上下文块 |
 | Gemini Web | 浏览器扩展 | 支持受限 | 用户确认后支持 | 输入框插入 |
+| CLI / Skill 底层 | Gateway + CLI（SDK） | 支持 | 支持 | 由调用方注入（`context build --json` 返回上下文与 `decision_id`） |
 
 ## 18. 可观测性
 

@@ -1040,7 +1040,7 @@
             </article>
           </div>
 
-          <div class="grid cols-2" style="margin-top: 14px;">
+          <div class="grid cols-3" style="margin-top: 14px;">
             <article class="tile">
               <h4>MCP Server 工具</h4>
               <ul>
@@ -1059,6 +1059,16 @@
                 <li><code>client.context.build()</code></li>
                 <li><code>client.policies.update()</code></li>
               </ul>
+            </article>
+            <article class="tile">
+              <h4>CLI · skill 底层</h4>
+              <p><code>gotomemory</code> 是 Gateway 的薄客户端；任何能调子进程的 skill 都可 shell out 接入记忆控制面。</p>
+              <ul>
+                <li><code>gotomemory context build --json</code></li>
+                <li><code>gotomemory memory create | search</code></li>
+                <li><code>--json</code> · 稳定退出码 · <code>--no-input</code></li>
+              </ul>
+              <div class="badge-row"><span class="badge ok">scriptable</span><span class="badge warn">governed</span></div>
             </article>
           </div>
         </section>
