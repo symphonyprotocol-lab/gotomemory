@@ -1,6 +1,9 @@
 # Prose specs are authored by hand, not Prettier-formatted.
 specs/
 
+# Python workspace — formatted by Ruff, not Prettier.
+py/
+
 # Build output, caches, committed codegen artifacts.
 dist/
 .turbo/
