@@ -1,0 +1,25 @@
+{
+  "name": "@gotomemory/cli",
+  "version": "0.0.0",
+  "description": "gotomemory CLI — Gateway client and skill substrate (system spec §16.5).",
+  "type": "module",
+  "bin": {
+    "gotomemory": "./dist/bin.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "dev": "tsx src/bin.ts"
+  },
+  "dependencies": {
+    "@gotomemory/sdk": "workspace:*",
+    "commander": "^12.1.0"
+  }
+}

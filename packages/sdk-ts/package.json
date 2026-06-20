@@ -1,0 +1,27 @@
+{
+  "name": "@gotomemory/sdk",
+  "version": "0.0.0",
+  "description": "TypeScript SDK for the gotomemory Gateway API (system spec §16.3).",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@gotomemory/contracts": "workspace:*",
+    "openapi-fetch": "^0.12.0"
+  }
+}

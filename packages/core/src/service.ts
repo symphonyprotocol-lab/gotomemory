@@ -10,6 +10,7 @@ import type {
   SearchRequest,
   SearchResponse,
   SearchResultItem,
+  UpdateMemoryRequest,
 } from "@gotomemory/contracts";
 import { type EncryptedBlob, EnvelopeCipher, makePreview } from "@gotomemory/crypto";
 import {
@@ -485,6 +486,58 @@ export class MemoryService {
       decision_id: pending.decisionId,
       omitted,
     };
+  }
+
+  async updateMemory(
+    ctx: RequestContext,
+    id: string,
+    req: UpdateMemoryRequest,
+  ): Promise<CreateMemoryResponse> {
+    const now = this.clock();
+    const record = await this.repo.getById(ctx.tenantId, id);
+    if (!record || record.status === "deleted") throw new NotFoundError(id);
+
+    const decision = evaluate(this.policiesFor(ctx.tenantId), {
+      tenantId: ctx.tenantId,
+      subjectId: ctx.subjectId,
+      action: "update",
+      platform: ctx.platform,
+      clientId: ctx.clientId,
+      scope: record.scope,
+      memory: { type: record.type, tags: record.tags, sensitivity: record.sensitivity },
+      now,
+    });
+    if (decision.effect === "deny") throw new PolicyDeniedError("update", decision);
+
+    const nowIso = new Date(now).toISOString();
+    const next: MemoryRecord = { ...record, updatedAt: nowIso };
+    if (req.content !== undefined) {
+      next.contentEncrypted = JSON.stringify(this.cipher.encrypt(req.content));
+      if (req.summary === undefined) {
+        next.summaryEncrypted = JSON.stringify(this.cipher.encrypt(deriveSummary(req.content)));
+        next.summaryPreview =
+          next.sensitivity === "secret" ? null : makePreview(deriveSummary(req.content));
+      }
+    }
+    if (req.summary !== undefined) {
+      next.summaryEncrypted = JSON.stringify(this.cipher.encrypt(req.summary));
+      next.summaryPreview = next.sensitivity === "secret" ? null : makePreview(req.summary);
+    }
+    if (req.tags !== undefined) next.tags = req.tags;
+    if (req.sensitivity !== undefined) next.sensitivity = req.sensitivity;
+    if (req.status !== undefined) next.status = req.status;
+
+    const saved = await this.repo.update(next, req.version);
+    await this.audit.record(
+      {
+        tenantId: ctx.tenantId,
+        eventType: "memory.updated",
+        actorId: ctx.subjectId,
+        memoryIds: [id],
+      },
+      now,
+    );
+    return { id, status: saved.status, sensitivity: saved.sensitivity, version: saved.version };
   }
 
   async deleteMemory(ctx: RequestContext, id: string): Promise<boolean> {
