@@ -1,0 +1,31 @@
+[project]
+name = "gotomemory-workspace"
+version = "0.0.0"
+description = "gotomemory Python workspace (uv)."
+requires-python = ">=3.12"
+dependencies = ["gotomemory"]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["sdk"]
+
+[tool.uv.sources]
+gotomemory = { workspace = true }
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.11"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.pytest.ini_options]
+testpaths = ["sdk/tests"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true

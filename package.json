@@ -22,7 +22,10 @@
     "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run boundaries",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release": "turbo run build && changeset publish"
+    "release": "turbo run build && changeset publish",
+    "py:install": "cd py && uv sync",
+    "py:test": "cd py && uv run pytest -q",
+    "py:lint": "cd py && uv run ruff check . && uv run mypy sdk/src"
   },
   "prettier": "@gotomemory/config-ts/prettier",
   "devDependencies": {
