@@ -1,0 +1,24 @@
+{
+  "name": "@gotomemory/mcp-server",
+  "version": "0.0.0",
+  "private": true,
+  "description": "MCP server exposing governed memory tools over the SDK (system spec §16.1).",
+  "type": "module",
+  "bin": {
+    "gotomemory-mcp": "./dist/bin.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "dev": "tsx src/bin.ts"
+  },
+  "dependencies": {
+    "@gotomemory/sdk": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.23.8"
+  }
+}

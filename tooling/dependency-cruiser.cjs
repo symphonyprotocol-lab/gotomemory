@@ -27,7 +27,7 @@ module.exports = {
       comment:
         "SDK/CLI and frontends only talk to the Gateway via sdk-ts; they must not bundle " +
         "server logic, storage, or crypto (zero-privilege boundary).",
-      from: { path: "^(packages/(sdk-ts|cli)|apps/(cli|console|extension))/" },
+      from: { path: "^(packages/(sdk-ts|cli)|apps/(cli|mcp-server|console|extension))/" },
       to: { path: "^packages/(core|db|crypto|audit|policy)/" },
     },
     {
