@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+.output/
+*.tsbuildinfo
+
+# Generated codegen artifacts are committed; local caches are not
+.turbo/
+coverage/
+
+# Python
+__pycache__/
+.venv/
+*.egg-info/
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+*.log
