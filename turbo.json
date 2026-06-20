@@ -16,8 +16,7 @@
       "inputs": ["src/**", "package.json", "tsconfig.json"]
     },
     "test": {
-      "dependsOn": ["^build"],
-      "outputs": ["coverage/**"]
+      "dependsOn": ["^build"]
     },
     "codegen": {
       "inputs": ["openapi/**", "schemas/**"],

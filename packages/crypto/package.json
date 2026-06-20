@@ -1,0 +1,21 @@
+{
+  "name": "@gotomemory/crypto",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Envelope encryption (AES-256-GCM) and redaction for gotomemory (system spec §13).",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  }
+}

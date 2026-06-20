@@ -1,3 +1,11 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# esbuild (pulled in by vitest/tsx) ships a prebuilt platform binary; approve its
+# install script under pnpm's secure-by-default build gating.
+onlyBuiltDependencies:
+  - esbuild
+
+allowBuilds:
+  esbuild: true
