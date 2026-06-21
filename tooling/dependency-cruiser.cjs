@@ -59,6 +59,6 @@ module.exports = {
     doNotFollow: { path: "node_modules" },
     includeOnly: "^(apps|packages)/",
     tsPreCompilationDeps: true,
-    exclude: { path: "(\\.test\\.|/__tests__/|/dist/|/generated/)" },
+    exclude: { path: "(\\.test\\.|/__tests__/|/dist/|/generated/|/\\.wxt/|/\\.output/)" },
   },
 };

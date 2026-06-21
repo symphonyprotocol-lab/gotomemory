@@ -16,6 +16,8 @@ apps/
   gateway/       Memory Gateway API (Fastify) over the orchestrator
   cli/           gotomemory CLI / skill substrate (commander)
   mcp-server/    MCP server exposing governed memory tools
+  console/       web console (Vite) over the SDK
+  extension/     browser extension (WXT) for ChatGPT/Claude/Gemini web
 packages/
   contracts/     OpenAPI + generated types — single source of truth
   core/          Memory Orchestrator (classify, retrieve, policy filter, refresh)
@@ -36,10 +38,11 @@ enforced in CI by `pnpm boundaries`.
 
 ## Status
 
-The MVP system is implemented and tested end-to-end: create → search (preview-only) →
+The full system is implemented and tested end-to-end: create → search (preview-only) →
 read → `context/build` + confirm, with deterministic policy, envelope encryption, refresh,
-and audit. 50 TS tests + Python SDK tests pass. The browser **console** and **extension**
-(spec milestones M4/M5) are intentionally not built yet.
+and audit. Every app in the monorepo guide is built — gateway, CLI, MCP server, web
+console (Vite), and browser extension (WXT) — plus TypeScript and Python SDKs. 56 TS tests
+and the Python SDK tests pass; `pnpm check` (lint/typecheck/boundaries) is green.
 
 ## Develop
 

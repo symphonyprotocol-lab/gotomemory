@@ -1,0 +1,19 @@
+{
+  "name": "@gotomemory/extension",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Browser extension — inject user-authorized memory into AI web chats (system spec §16.2).",
+  "type": "module",
+  "scripts": {
+    "build": "wxt build",
+    "dev": "wxt",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@gotomemory/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "wxt": "^0.19.13"
+  }
+}

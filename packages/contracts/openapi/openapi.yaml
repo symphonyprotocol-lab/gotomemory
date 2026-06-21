@@ -336,7 +336,7 @@ components:
           type: array
           items: { $ref: "#/components/schemas/Scope" }
         project_id: { type: string }
-        limit: { type: integer, default: 12 }
+        limit: { type: integer, description: "Max results (server default 12)." }
         cursor:
           type: [string, "null"]
       additionalProperties: false
@@ -413,7 +413,11 @@ components:
         conversation_excerpt:
           type: string
           description: Used only for this retrieval; never logged or persisted (§9.3, §18).
-        token_budget: { type: integer, default: 1200 }
+        token_budget:
+          {
+            type: integer,
+            description: "Token budget for the built context (server default 1200).",
+          }
         project_id: { type: string }
       additionalProperties: false
 

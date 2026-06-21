@@ -6,6 +6,7 @@ import type {
   UpdateMemoryRequest,
 } from "@gotomemory/contracts";
 import type { MemoryService, RequestContext } from "@gotomemory/core";
+import cors from "@fastify/cors";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import { type AuthResolver, devAuthResolver } from "./auth.js";
 import { errorBody, mapError } from "./errors.js";
@@ -13,12 +14,18 @@ import { errorBody, mapError } from "./errors.js";
 export interface ServerOptions {
   service: MemoryService;
   auth?: AuthResolver;
+  /** Enable permissive CORS so the browser console/extension can call the gateway. */
+  cors?: boolean;
 }
 
 export function buildServer(opts: ServerOptions): FastifyInstance {
   const app = Fastify({ logger: false });
   const auth = opts.auth ?? devAuthResolver;
   const { service } = opts;
+
+  if (opts.cors) {
+    void app.register(cors, { origin: true });
+  }
 
   const guard = (req: FastifyRequest, reply: FastifyReply): RequestContext | null => {
     const ctx = auth(req);

@@ -18,7 +18,7 @@ const service = new MemoryService({
   cipher: new EnvelopeCipher(masterKey),
 });
 
-const app = buildServer({ service });
+const app = buildServer({ service, cors: true });
 const port = Number(process.env.PORT ?? 8787);
 
 app

@@ -188,8 +188,8 @@ export interface components {
             purpose?: string;
             scope?: components["schemas"]["Scope"][];
             project_id?: string;
-            /** @default 12 */
-            limit: number;
+            /** @description Max results (server default 12). */
+            limit?: number;
             cursor?: string | null;
         };
         /** @description Preview-only result. Never includes `content` (§9.2, §17.5). */
@@ -236,8 +236,8 @@ export interface components {
             task: string;
             /** @description Used only for this retrieval; never logged or persisted (§9.3, §18). */
             conversation_excerpt?: string;
-            /** @default 1200 */
-            token_budget: number;
+            /** @description Token budget for the built context (server default 1200). */
+            token_budget?: number;
             project_id?: string;
         };
         ContextBuildResponse: {

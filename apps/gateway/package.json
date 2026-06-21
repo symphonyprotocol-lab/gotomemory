@@ -12,6 +12,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@fastify/cors": "^10.0.1",
     "@gotomemory/audit": "workspace:*",
     "@gotomemory/contracts": "workspace:*",
     "@gotomemory/core": "workspace:*",
