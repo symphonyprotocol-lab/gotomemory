@@ -97,4 +97,44 @@ describe("gateway", () => {
     expect(res.json().memory_ids).toHaveLength(1);
     expect(res.json().decision_id).toMatch(/^dec_/);
   });
+
+  it("rejects a body missing required fields with 400 invalid_request", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/v1/memories",
+      headers: AUTH,
+      payload: { scope: "personal", type: "preference" }, // no content/source
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().error.code).toBe("invalid_request");
+  });
+
+  it("rejects unknown fields and invalid enum values", async () => {
+    const extra = await app.inject({
+      method: "POST",
+      url: "/v1/memories",
+      headers: AUTH,
+      payload: { scope: "personal", type: "preference", content: "x", source: "api", bogus: true },
+    });
+    expect(extra.statusCode).toBe(400);
+
+    const badEnum = await app.inject({
+      method: "POST",
+      url: "/v1/memories",
+      headers: AUTH,
+      payload: { scope: "nope", type: "preference", content: "x", source: "api" },
+    });
+    expect(badEnum.statusCode).toBe(400);
+    expect(badEnum.json().error.code).toBe("invalid_request");
+  });
+
+  it("authenticates before validating (bad body without creds -> 401, not 400)", async () => {
+    const res = await app.inject({
+      method: "POST",
+      url: "/v1/memories",
+      payload: { definitely: "invalid" },
+    });
+    expect(res.statusCode).toBe(401);
+    expect(res.json().error.code).toBe("unauthenticated");
+  });
 });

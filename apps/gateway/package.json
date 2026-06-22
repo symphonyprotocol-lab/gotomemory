@@ -18,6 +18,7 @@
     "@gotomemory/core": "workspace:*",
     "@gotomemory/crypto": "workspace:*",
     "@gotomemory/db": "workspace:*",
-    "fastify": "^5.1.0"
+    "fastify": "^5.1.0",
+    "yaml": "^2.9.0"
   }
 }
