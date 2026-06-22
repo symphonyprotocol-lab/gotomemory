@@ -91,6 +91,13 @@ export class MemoryService {
     return `dec_${this.ids()}`;
   }
 
+  /** Drop expired confirmation tokens so the pending map cannot grow without bound. */
+  private sweepExpired(now: number): void {
+    for (const [token, p] of this.pending) {
+      if (p.expiresAt <= now) this.pending.delete(token);
+    }
+  }
+
   private blob(serialized: string): EncryptedBlob {
     return JSON.parse(serialized) as EncryptedBlob;
   }
@@ -379,6 +386,7 @@ export class MemoryService {
 
     let confirmation: ContextBuildResponse["confirmation"];
     if (needConfirm.length > 0) {
+      this.sweepExpired(now);
       const token = `cnf_${this.ids()}`;
       this.pending.set(token, {
         tenantId: ctx.tenantId,
@@ -511,20 +519,40 @@ export class MemoryService {
 
     const nowIso = new Date(now).toISOString();
     const next: MemoryRecord = { ...record, updatedAt: nowIso };
+
+    // Re-run classification so update cannot bypass the create-time floor: detected secrets
+    // / credential hints still upgrade, and the privacy-bearing derived fields (summary
+    // sensitivity, embedding policy, preview) stay consistent with it (§13.3, §14.1).
+    const effectiveContent = req.content ?? this.cipher.decrypt(this.blob(record.contentEncrypted));
+    const cls = classify({
+      type: record.type,
+      content: effectiveContent,
+      sensitivity: req.sensitivity ?? record.sensitivity,
+    });
+    next.sensitivity = cls.sensitivity;
+    next.summarySensitivity = cls.summarySensitivity;
+    next.embeddingPolicy = cls.embeddingPolicy;
+
     if (req.content !== undefined) {
       next.contentEncrypted = JSON.stringify(this.cipher.encrypt(req.content));
-      if (req.summary === undefined) {
-        next.summaryEncrypted = JSON.stringify(this.cipher.encrypt(deriveSummary(req.content)));
-        next.summaryPreview =
-          next.sensitivity === "secret" ? null : makePreview(deriveSummary(req.content));
-      }
     }
-    if (req.summary !== undefined) {
-      next.summaryEncrypted = JSON.stringify(this.cipher.encrypt(req.summary));
-      next.summaryPreview = next.sensitivity === "secret" ? null : makePreview(req.summary);
+
+    const isSecret = cls.sensitivity === "secret";
+    let newSummary: string | null = null;
+    if (req.summary !== undefined) newSummary = req.summary;
+    else if (req.content !== undefined) newSummary = deriveSummary(req.content);
+
+    if (newSummary !== null) {
+      next.summaryEncrypted = JSON.stringify(this.cipher.encrypt(newSummary));
+      next.summaryPreview = isSecret ? null : makePreview(newSummary);
+    } else if (isSecret) {
+      next.summaryPreview = null; // sensitivity may have been upgraded — drop the preview
+    } else if (record.summaryPreview === null) {
+      // sensitivity dropped below secret — regenerate the preview from the stored summary
+      next.summaryPreview = makePreview(this.cipher.decrypt(this.blob(record.summaryEncrypted)));
     }
+
     if (req.tags !== undefined) next.tags = req.tags;
-    if (req.sensitivity !== undefined) next.sensitivity = req.sensitivity;
     if (req.status !== undefined) next.status = req.status;
 
     const saved = await this.repo.update(next, req.version);

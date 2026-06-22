@@ -107,6 +107,17 @@ describe("policy evaluate", () => {
     expect(evaluate([expiredDeny, broad], input()).effect).toBe("allow");
   });
 
+  it("scopes a policy to its subject (and honors the * wildcard)", () => {
+    const forU2 = policy({ id: "u2", subjectId: "u2" });
+    // a policy for u2 must not grant u1 anything
+    expect(evaluate([forU2], input({ subjectId: "u1" })).effect).toBe("deny");
+    expect(evaluate([forU2], input({ subjectId: "u2" })).effect).toBe("allow");
+    // "*" applies tenant-wide
+    expect(
+      evaluate([policy({ id: "all", subjectId: "*" })], input({ subjectId: "u1" })).effect,
+    ).toBe("allow");
+  });
+
   it("prefers the more specific allow when precedence ties", () => {
     const broad = policy({ id: "broad", injectionMode: "auto", precedence: 50 });
     const specific = policy({

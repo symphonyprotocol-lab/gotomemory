@@ -42,14 +42,21 @@ export interface AuditSink {
 }
 
 function hashEvent(event: AuditEvent, prevHash: string | null, at: number): string {
+  // Every integrity-relevant field is folded into the chain so tampering with any of them
+  // (not just ids/decision) breaks verify() (§7.6, §18).
   const canonical = JSON.stringify({
     prevHash,
     at,
     t: event.tenantId,
     e: event.eventType,
     a: event.actorId,
+    cl: event.clientId ?? null,
+    p: event.platform ?? null,
     m: event.memoryIds,
+    pu: event.purpose ?? null,
     d: event.decisionId ?? null,
+    de: event.decision ?? null,
+    r: event.redactionApplied ?? null,
     c: event.contentAccessLevel ?? "none",
   });
   return createHash("sha256").update(canonical).digest("hex");

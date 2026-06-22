@@ -173,7 +173,9 @@ export function buildProgram(factory: ClientFactory = defaultFactory): Command {
   context
     .command("confirm")
     .requiredOption("--decision-id <id>")
-    .requiredOption("--token <token>", "confirmation token")
+    // Not `--token`: that is the global bearer-credential flag, and a colliding local
+    // option would clobber it via optsWithGlobals() and break authentication.
+    .requiredOption("--confirmation-token <token>", "confirmation token")
     .requiredOption("--ids <list>", "comma-separated memory ids to confirm")
     .action(async (_o, cmd: Command) => {
       const g = globals(cmd);
@@ -181,7 +183,7 @@ export function buildProgram(factory: ClientFactory = defaultFactory): Command {
       try {
         const res = await factory(g).context.confirm({
           decision_id: o.decisionId,
-          confirmation_token: o.token,
+          confirmation_token: o.confirmationToken,
           confirmed_memory_ids: csv(o.ids as string),
         });
         emit(g.json, res.context ?? "(nothing injected)", res);

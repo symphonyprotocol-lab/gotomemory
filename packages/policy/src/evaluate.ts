@@ -65,6 +65,9 @@ export function evaluate(policies: Policy[], input: EvalInput): Decision {
   const matches = policies.filter(
     (p) =>
       p.tenantId === input.tenantId &&
+      // `*` is the tenant-wide wildcard; otherwise the policy is scoped to one subject.
+      // (Role/group expansion for subjectType !== "user" is future work — not yet wired.)
+      (p.subjectId === "*" || p.subjectId === input.subjectId) &&
       p.action === input.action &&
       dimMatch(p.platform, input.platform) &&
       dimMatch(p.clientId, input.clientId) &&

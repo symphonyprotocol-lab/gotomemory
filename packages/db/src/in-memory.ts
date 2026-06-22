@@ -69,7 +69,7 @@ export class InMemoryMemoryRepository implements MemoryRepository {
     const existing = this.store.get(this.key(tenantId, id));
     if (!existing) return Promise.resolve(false);
     existing.status = "deleted";
-    existing.updatedAt = new Date(0).toISOString();
+    existing.updatedAt = new Date().toISOString();
     return Promise.resolve(true);
   }
 

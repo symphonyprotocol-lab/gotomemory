@@ -167,6 +167,41 @@ describe("MemoryService", () => {
     expect(audit.list("t1").some((e) => e.eventType === "memory.superseded")).toBe(true);
   });
 
+  it("update cannot downgrade a detected secret below its classified floor", async () => {
+    const created = await service.createMemory(ctx, {
+      scope: "personal",
+      type: "credential_hint",
+      content: "vault path: secret/db",
+      source: "user_explicit",
+    });
+    expect(created.sensitivity).toBe("secret");
+    const updated = await service.updateMemory(ctx, created.id, {
+      sensitivity: "public",
+      version: created.version,
+    });
+    // credential_hint forces secret on re-classification regardless of the submitted value
+    expect(updated.sensitivity).toBe("secret");
+  });
+
+  it("update to secret nulls the preview and drops it from default search", async () => {
+    const created = await service.createMemory(ctx, {
+      scope: "personal",
+      type: "note",
+      content: "team standup is at 10am",
+      source: "user_explicit",
+      tags: ["schedule"],
+    });
+    const before = await service.searchMemories(ctx, { query: "standup", platform: "claude" });
+    expect(before.items).toHaveLength(1);
+
+    await service.updateMemory(ctx, created.id, {
+      sensitivity: "secret",
+      version: created.version,
+    });
+    const after = await service.searchMemories(ctx, { query: "standup", platform: "claude" });
+    expect(after.items).toHaveLength(0); // secret exceeds the default read+inject ceiling
+  });
+
   it("denies create when no policy allows it", async () => {
     const denying = new MemoryService({
       repo: new InMemoryMemoryRepository(),
