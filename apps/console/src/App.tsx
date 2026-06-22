@@ -5,7 +5,17 @@ import {
   type SearchResponse,
   SdkError,
 } from "@gotomemory/sdk";
-import { Brain, Loader2, Plus, Search, Settings2, Sparkles } from "lucide-react";
+import {
+  Brain,
+  Loader2,
+  Moon,
+  Plus,
+  Search,
+  SearchX,
+  Settings2,
+  Sparkles,
+  Sun,
+} from "lucide-react";
 import * as React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +26,7 @@ import { accessFlags, sensitivityVariant, shortId } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const MEMORY_TYPES = ["preference", "fact", "note", "instruction", "credential_hint"] as const;
+const PAGE = 8;
 
 function useSetting(key: string, fallback: string): readonly [string, (v: string) => void] {
   const [value, setValue] = React.useState(() => globalThis.localStorage?.getItem(key) ?? fallback);
@@ -23,6 +34,19 @@ function useSetting(key: string, fallback: string): readonly [string, (v: string
     globalThis.localStorage?.setItem(key, value);
   }, [key, value]);
   return [value, setValue] as const;
+}
+
+function useTheme(): readonly [boolean, () => void] {
+  const [dark, setDark] = React.useState(() => {
+    const saved = globalThis.localStorage?.getItem("gm.theme");
+    if (saved) return saved === "dark";
+    return globalThis.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
+  });
+  React.useEffect(() => {
+    document.documentElement.classList.toggle("dark", dark);
+    globalThis.localStorage?.setItem("gm.theme", dark ? "dark" : "light");
+  }, [dark]);
+  return [dark, () => setDark((d) => !d)] as const;
 }
 
 function errorText(err: unknown): string {
@@ -33,6 +57,7 @@ export default function App(): React.JSX.Element {
   const [baseUrl, setBaseUrl] = useSetting("gm.baseUrl", "http://localhost:8787/v1");
   const [token, setToken] = useSetting("gm.token", "t1:u1");
   const [showSettings, setShowSettings] = React.useState(false);
+  const [dark, toggleTheme] = useTheme();
   const client = React.useMemo(() => createClient({ baseUrl, token }), [baseUrl, token]);
 
   return (
@@ -48,14 +73,19 @@ export default function App(): React.JSX.Element {
               <p className="text-sm text-muted-foreground">Memory Control Plane</p>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowSettings((s) => !s)}
-            aria-label="settings"
-          >
-            <Settings2 />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="toggle theme">
+              {dark ? <Sun /> : <Moon />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowSettings((s) => !s)}
+              aria-label="settings"
+            >
+              <Settings2 />
+            </Button>
+          </div>
         </header>
 
         {showSettings && (
@@ -161,15 +191,17 @@ function SearchCard({ client }: { client: Client }): React.JSX.Element {
   const [query, setQuery] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [items, setItems] = React.useState<SearchResponse["items"] | null>(null);
+  const [limit, setLimit] = React.useState(PAGE);
   const [error, setError] = React.useState<string | null>(null);
 
-  async function run(): Promise<void> {
+  async function run(nextLimit: number): Promise<void> {
     if (!query.trim()) return;
     setBusy(true);
     setError(null);
     try {
-      const res = await client.memories.search({ query, platform: "claude" });
+      const res = await client.memories.search({ query, platform: "claude", limit: nextLimit });
       setItems(res.items);
+      setLimit(nextLimit);
     } catch (err) {
       setError(errorText(err));
       setItems(null);
@@ -177,6 +209,8 @@ function SearchCard({ client }: { client: Client }): React.JSX.Element {
       setBusy(false);
     }
   }
+
+  const canLoadMore = items != null && items.length === limit;
 
   return (
     <Card>
@@ -191,27 +225,49 @@ function SearchCard({ client }: { client: Client }): React.JSX.Element {
             placeholder="query"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && void run()}
+            onKeyDown={(e) => e.key === "Enter" && void run(PAGE)}
           />
-          <Button variant="secondary" onClick={() => void run()} disabled={busy}>
+          <Button variant="secondary" onClick={() => void run(PAGE)} disabled={busy}>
             {busy ? <Loader2 className="animate-spin" /> : <Search />} Search
           </Button>
         </div>
+
         {error && <p className="text-sm text-destructive">{error}</p>}
-        {items && items.length === 0 && (
-          <p className="text-sm text-muted-foreground">No memories.</p>
+
+        {items != null && items.length === 0 && (
+          <div className="flex flex-col items-center gap-2 rounded-md border border-dashed py-10 text-muted-foreground">
+            <SearchX className="size-6" />
+            <p className="text-sm">No memories match this query.</p>
+          </div>
         )}
-        {items && items.length > 0 && (
-          <ul className="divide-y rounded-md border">
-            {items.map((i) => (
-              <li key={i.id} className="flex items-center gap-2 px-3 py-2 text-sm">
-                <code className="font-mono text-xs text-muted-foreground">{shortId(i.id)}</code>
-                <Badge variant={sensitivityVariant(i.sensitivity)}>{i.sensitivity}</Badge>
-                <span className="flex-1 truncate">{i.summary_preview}</span>
-                <span className="text-xs text-muted-foreground">{accessFlags(i.access)}</span>
-              </li>
-            ))}
-          </ul>
+
+        {items != null && items.length > 0 && (
+          <>
+            <p className="text-xs text-muted-foreground">
+              {items.length} result{items.length === 1 ? "" : "s"}
+            </p>
+            <ul className="divide-y rounded-md border">
+              {items.map((i) => (
+                <li key={i.id} className="flex items-center gap-2 px-3 py-2 text-sm">
+                  <code className="font-mono text-xs text-muted-foreground">{shortId(i.id)}</code>
+                  <Badge variant={sensitivityVariant(i.sensitivity)}>{i.sensitivity}</Badge>
+                  <span className="flex-1 truncate">{i.summary_preview}</span>
+                  <span className="text-xs text-muted-foreground">{accessFlags(i.access)}</span>
+                </li>
+              ))}
+            </ul>
+            {canLoadMore && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="self-center"
+                onClick={() => void run(limit + PAGE)}
+                disabled={busy}
+              >
+                {busy ? <Loader2 className="animate-spin" /> : null} Load more
+              </Button>
+            )}
+          </>
         )}
       </CardContent>
     </Card>

@@ -12,26 +12,42 @@ async function init(app: HTMLElement): Promise<void> {
 
   app.innerHTML = `
     <style>
-      #app { font: 13px/1.5 system-ui, sans-serif; }
+      /* Neutral palette aligned with the console (shadcn new-york), with dark-mode support. */
+      body { background: #ffffff; }
+      #app { --fg:#0a0a0a; --muted:#737373; --border:#e5e5e5; --soft:#f5f5f5;
+        --primary:#18181b; --primary-fg:#fafafa; --ring:#a3a3a3;
+        font: 13px/1.5 system-ui, -apple-system, sans-serif; color: var(--fg); }
+      @media (prefers-color-scheme: dark) {
+        body { background: #0a0a0a; }
+        #app { --fg:#fafafa; --muted:#a3a3a3; --border:#262626; --soft:#1c1c1c;
+          --primary:#fafafa; --primary-fg:#18181b; --ring:#525252; }
+      }
       #app .row { display: flex; gap: 6px; margin: 8px 0; }
-      #app input { flex: 1; padding: 5px 7px; border: 1px solid #d2d6dc; border-radius: 6px; font: inherit; }
-      #app button { padding: 5px 10px; border: 1px solid #0f766e; background: #0f766e; color: #fff;
-        border-radius: 6px; font: inherit; cursor: pointer; white-space: nowrap; }
-      #app button.ghost { background: #fff; color: #0f766e; }
-      #app button:disabled { opacity: .55; cursor: default; }
-      #app .status { font-size: 12px; padding: 5px 8px; border-radius: 6px; background: #f1f5f4; margin: 6px 0; }
-      #app .status b { color: #0f766e; }
-      #app .status.warn { background: #fff7ed; color: #b45309; }
+      #app input { flex: 1; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px;
+        background: transparent; color: var(--fg); font: inherit; }
+      #app input:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+      #app button { padding: 6px 11px; border: 1px solid var(--primary); background: var(--primary);
+        color: var(--primary-fg); border-radius: 6px; font: inherit; font-weight: 500; cursor: pointer; white-space: nowrap; }
+      #app button.ghost { background: transparent; color: var(--fg); border-color: var(--border); }
+      #app button:hover { opacity: .9; }
+      #app button:disabled { opacity: .5; cursor: default; }
+      #app .status { font-size: 12px; padding: 6px 9px; border-radius: 6px; background: var(--soft);
+        border: 1px solid var(--border); margin: 6px 0; }
+      #app .status b { color: var(--fg); font-weight: 600; }
+      #app .status.warn { background: #fff7ed; border-color: #fed7aa; color: #b45309; }
       #app ul { list-style: none; padding: 0; margin: 6px 0; }
-      #app li { padding: 4px 0; border-bottom: 1px solid #eef1f5; }
-      #app .sens { font-size: 11px; padding: 0 6px; border-radius: 99px; background: #eef2ff; }
-      #app .sens.private { background: #fff7ed; } #app .sens.secret { background: #fef2f2; }
-      #app em { color: #607080; font-size: 11px; }
-      #app .muted { color: #6b716c; font-size: 12px; }
-      #app pre { background: #f7f8fa; padding: 8px; border-radius: 6px; white-space: pre-wrap;
-        max-height: 130px; overflow: auto; font-size: 11px; }
-      #app details { margin-top: 10px; border-top: 1px solid #eef1f5; padding-top: 6px; }
-      #app summary { cursor: pointer; color: #607080; font-size: 12px; }
+      #app li { padding: 5px 0; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 6px; }
+      #app .sens { font-size: 11px; font-weight: 500; padding: 1px 6px; border-radius: 6px;
+        background: var(--soft); color: var(--fg); }
+      #app .sens.private { background: #fbe8c6; color: #854d0e; }
+      #app .sens.secret { background: #fee2e2; color: #b91c1c; }
+      #app em { color: var(--muted); font-size: 11px; font-style: normal; }
+      #app .muted { color: var(--muted); font-size: 12px; }
+      #app code { font-family: ui-monospace, monospace; color: var(--muted); font-size: 11px; }
+      #app pre { background: var(--soft); border: 1px solid var(--border); padding: 8px; border-radius: 6px;
+        white-space: pre-wrap; max-height: 130px; overflow: auto; font-size: 11px; }
+      #app details { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px; }
+      #app summary { cursor: pointer; color: var(--muted); font-size: 12px; }
     </style>
     <div class="status" id="status">检测中…</div>
     <div class="row"><input id="task" placeholder="任务（构建并注入相关记忆）" /><button id="build">构建并注入</button></div>
