@@ -202,6 +202,25 @@ describe("MemoryService", () => {
     expect(after.items).toHaveLength(0); // secret exceeds the default read+inject ceiling
   });
 
+  it("scopes direct-id access to the owner within a tenant", async () => {
+    // Same tenant, different owner: the default tenant-wide policies allow read/inject, so
+    // owner isolation must come from the service, not policy (§4.1).
+    const other: RequestContext = { tenantId: "t1", subjectId: "u2", ownerId: "u2" };
+    const created = await service.createMemory(ctx, {
+      scope: "personal",
+      type: "note",
+      content: "u1 private note",
+      source: "user_explicit",
+    });
+    await expect(service.readMemory(other, created.id, "snooping")).rejects.toThrow(/not found/);
+    await expect(
+      service.updateMemory(other, created.id, { content: "tampered", version: created.version }),
+    ).rejects.toThrow(/not found/);
+    expect(await service.deleteMemory(other, created.id)).toBe(false);
+    // The owner still has full access.
+    expect((await service.readMemory(ctx, created.id, "own")).content).toBe("u1 private note");
+  });
+
   it("denies create when no policy allows it", async () => {
     const denying = new MemoryService({
       repo: new InMemoryMemoryRepository(),

@@ -102,6 +102,20 @@ export class MemoryService {
     return JSON.parse(serialized) as EncryptedBlob;
   }
 
+  /**
+   * Fetch a live record scoped to both tenant AND owner. Direct-id access must be
+   * owner-scoped the same way {@link MemoryRepository.searchActive} is (§4.1): the default
+   * per-tenant policies are tenant-wide (subjectId `*`), so without this check one user
+   * could read/update/delete another user's memory by id within the same tenant. Returns
+   * null for missing, soft-deleted, or non-owned records — callers surface that as 404 so
+   * existence is never leaked across owners.
+   */
+  private async ownedActive(ctx: RequestContext, id: string): Promise<MemoryRecord | null> {
+    const record = await this.repo.getById(ctx.tenantId, id);
+    if (!record || record.status === "deleted" || record.ownerId !== ctx.ownerId) return null;
+    return record;
+  }
+
   async createMemory(ctx: RequestContext, req: CreateMemoryRequest): Promise<CreateMemoryResponse> {
     const now = this.clock();
     const cls = classify(req);
@@ -288,8 +302,8 @@ export class MemoryService {
 
   async readMemory(ctx: RequestContext, id: string, purpose: string): Promise<MemoryRead> {
     const now = this.clock();
-    const record = await this.repo.getById(ctx.tenantId, id);
-    if (!record || record.status === "deleted") throw new NotFoundError(id);
+    const record = await this.ownedActive(ctx, id);
+    if (!record) throw new NotFoundError(id);
 
     const decision = evaluate(this.policiesFor(ctx.tenantId), {
       tenantId: ctx.tenantId,
@@ -449,8 +463,8 @@ export class MemoryService {
         omitted.push({ memory_id: id, reason: "not_confirmed" });
         continue;
       }
-      const record = await this.repo.getById(ctx.tenantId, id);
-      if (!record || record.status === "deleted") {
+      const record = await this.ownedActive(ctx, id);
+      if (!record) {
         omitted.push({ memory_id: id, reason: "not_found" });
         continue;
       }
@@ -466,7 +480,14 @@ export class MemoryService {
         memory: { type: record.type, tags: record.tags, sensitivity: record.sensitivity },
         now,
       });
-      if (decision.effect === "deny" || decision.injectionMode === "never") {
+      // Mirror buildContext: a memory that tightened to manual_only/never between build and
+      // redemption (e.g. reclassified to secret) must not be injectable via a stale token
+      // (§9.3.1, §16.5.3) — confirmation never upgrades a non-confirm injection mode.
+      if (
+        decision.effect === "deny" ||
+        decision.injectionMode === "never" ||
+        decision.injectionMode === "manual_only"
+      ) {
         omitted.push({ memory_id: id, reason: "policy_denied" });
         continue;
       }
@@ -502,8 +523,8 @@ export class MemoryService {
     req: UpdateMemoryRequest,
   ): Promise<CreateMemoryResponse> {
     const now = this.clock();
-    const record = await this.repo.getById(ctx.tenantId, id);
-    if (!record || record.status === "deleted") throw new NotFoundError(id);
+    const record = await this.ownedActive(ctx, id);
+    if (!record) throw new NotFoundError(id);
 
     const decision = evaluate(this.policiesFor(ctx.tenantId), {
       tenantId: ctx.tenantId,
@@ -570,6 +591,9 @@ export class MemoryService {
 
   async deleteMemory(ctx: RequestContext, id: string): Promise<boolean> {
     const now = this.clock();
+    // Owner-scope the delete like read/update: another user in the tenant must not be able
+    // to delete a memory by id. Already-deleted/non-owned records report 404, not 204.
+    if (!(await this.ownedActive(ctx, id))) return false;
     const ok = await this.repo.softDelete(ctx.tenantId, id);
     if (ok) {
       await this.audit.record(

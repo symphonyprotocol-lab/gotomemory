@@ -66,6 +66,9 @@ CREATE UNIQUE INDEX uq_memories_active_slot
 CREATE INDEX ix_memories_recall ON memories (tenant_id, owner_id, scope, status);
 CREATE INDEX ix_memories_tags ON memories USING GIN (tags);
 CREATE INDEX ix_memories_ttl ON memories (ttl) WHERE ttl IS NOT NULL;
+-- Refresh-key lookup and expiry/history scans (§8.8).
+CREATE INDEX ix_memories_slot ON memories (tenant_id, subject, predicate) WHERE status = 'active';
+CREATE INDEX ix_memories_valid_to ON memories (valid_to) WHERE valid_to IS NOT NULL;
 
 CREATE TABLE memory_embeddings (
   memory_id UUID NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
@@ -89,7 +92,9 @@ CREATE TABLE memory_policies (
   subject_type TEXT NOT NULL,
   effect TEXT NOT NULL DEFAULT 'allow',
   action TEXT NOT NULL,
-  platform TEXT NOT NULL,
+  -- Nullable match-any dimension (§8.3): NULL matches any platform, a value matches only
+  -- that platform. The evaluator and default policy set rely on this (platform = NULL).
+  platform TEXT,
   client_id TEXT,
   scope TEXT,
   purpose TEXT,
