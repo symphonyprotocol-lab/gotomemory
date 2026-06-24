@@ -1,71 +1,30 @@
 # gotomemory
 
-Cross-platform **Memory Control Plane** — governs how user memories are authorized,
-audited, and injected into ChatGPT, Claude, and Gemini contexts.
+**Your AI memory, everywhere.** Tell one assistant, and ChatGPT, Claude, and Gemini all
+remember — plus one-click read-only sharing for whatever they generate. Built for ordinary
+users: simple to use, near-zero learning curve.
 
 ## Specs
 
-- [System spec](specs/memory-sharing-system.md) — what the system does.
-- [Share pages spec](specs/share-pages-system.md) — read-only artifact sharing for
-  generated HTML, Markdown, PDF, Word, Excel, and PowerPoint.
-- [Monorepo guide](specs/monorepo-guide.md) — how the code is organized.
-- [Overview](specs/overview.html) — static visual overview.
+The specs are **consumer-first**: the simple, easy-to-use product is the MVP, and the
+enterprise-grade governance (policy engine, audit, multi-tenancy, fine-grained sensitivity)
+is deferred to a clearly-marked "后续高级层 / advanced layer" section in each spec.
 
-## Layout
-
-```
-apps/
-  gateway/       Memory Gateway API (Fastify) over the orchestrator
-  cli/           gotomemory CLI / skill substrate (commander)
-  mcp-server/    MCP server exposing governed memory tools
-  console/       web console (Vite) over the SDK
-  extension/     browser extension (WXT) for ChatGPT/Claude/Gemini web
-packages/
-  contracts/     OpenAPI + generated types — single source of truth
-  core/          Memory Orchestrator (classify, retrieve, policy filter, refresh)
-  policy/        deterministic Memory Policy evaluation
-  crypto/        AES-256-GCM envelope encryption + redaction
-  db/            repository interface + in-memory impl + SQL migration
-  audit/         append-only audit sink with a hash chain
-  adapters/      ChatGPT/Claude/Gemini payload strategies + manifests
-  sdk-ts/        TypeScript SDK (openapi-fetch)
-  config-ts/     shared ESLint + Prettier presets
-py/sdk/          Python SDK (uv workspace, httpx)
-infra/           docker-compose, IaC (planned)
-```
-
-Per [monorepo-guide](specs/monorepo-guide.md) §5.2, dependency boundaries map the security
-model onto packages — e.g. adapters/SDK/CLI can never reach storage or crypto. This is
-enforced in CI by `pnpm boundaries`.
+- [System spec](specs/memory-sharing-system.md) — cross-assistant memory for everyday users.
+- [Share pages spec](specs/share-pages-system.md) — paste/upload → read-only share link
+  (HTML, Markdown, PDF; Office to follow).
 
 ## Status
 
-The full system is implemented and tested end-to-end: create → search (preview-only) →
-read → `context/build` + confirm, with deterministic policy, envelope encryption, refresh,
-and audit. Every app in the monorepo guide is built — gateway, CLI, MCP server, web
-console (Vite), and browser extension (WXT) — plus TypeScript and Python SDKs. 56 TS tests
-and the Python SDK tests pass; `pnpm check` (lint/typecheck/boundaries) is green.
+**Clean slate.** The previous enterprise-grade implementation has been cleared so the
+product can be rebuilt from the simplified, consumer-first specs above. What remains is the
+monorepo scaffolding (root `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`,
+`turbo.json`, ESLint config) and the two specs.
 
-## Develop
+## Next
 
-```bash
-corepack enable          # use the pinned pnpm
-pnpm install
-pnpm check               # format:check + lint + typecheck + boundaries
-pnpm -r test             # or: pnpm exec turbo run test
-pnpm py:install && pnpm py:test   # Python SDK
-```
+Rebuild from the specs, with the browser extension as the P0 surface (it is what ordinary
+users actually touch), backed by a minimal cloud store and a small set of memory + pages
+endpoints. See the MVP scope in each spec.
 
-## Run it
-
-```bash
-pnpm exec turbo run build
-PORT=8787 node apps/gateway/dist/index.js &          # start the gateway
-
-export GOTOMEMORY_URL=http://localhost:8787/v1 GOTOMEMORY_TOKEN=t1:u1
-echo "prefers TypeScript" | node apps/cli/dist/bin.js memory create --type preference --json
-node apps/cli/dist/bin.js memory search typescript --json
-node apps/cli/dist/bin.js context build --task "write code" --json
-```
-
-Requires Node 22.x, pnpm 11.x (pinned via `packageManager`), and uv for the Python SDK.
+Requires Node 22.x and pnpm 11.x (pinned via `packageManager`).
