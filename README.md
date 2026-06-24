@@ -18,6 +18,9 @@ is deferred to a clearly-marked "后续高级层 / advanced layer" section in ea
   (browser-extension-first), plus one-click conversation export (Markdown/PDF/Obsidian/Notion…).
 - [Share pages spec](specs/share-pages-system.md) — share a conversation (full or selected
   messages) as a read-only link, public or password-protected.
+- [Monorepo architecture spec](specs/monorepo-architecture.md) — the engineering skeleton the
+  two product specs map onto: package layout, dependency boundaries, the shared contract, the
+  local-first execution model, and the build/test/release pipeline.
 
 ## Status
 
