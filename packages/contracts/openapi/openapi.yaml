@@ -14,11 +14,54 @@ servers:
 security:
   - bearerAuth: []
 tags:
+  - name: auth
   - name: memories
   - name: context
+  - name: pages
   - name: transfer
 
 paths:
+  /auth/login:
+    post:
+      tags: [auth]
+      operationId: login
+      summary: Create a user session from a provider credential.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AuthLoginRequest" }
+      responses:
+        "201":
+          description: Authenticated session.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthLoginResponse" }
+        "400": { $ref: "#/components/responses/InvalidRequest" }
+
+  /auth/me:
+    get:
+      tags: [auth]
+      operationId: getCurrentUser
+      summary: Read the current authenticated user.
+      responses:
+        "200":
+          description: Current user.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthMeResponse" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      summary: Revoke the current session token.
+      responses:
+        "204": { description: Session revoked. }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+
   /memories:
     post:
       tags: [memories]
@@ -156,6 +199,130 @@ paths:
         "403": { $ref: "#/components/responses/PolicyDenied" }
         "404": { $ref: "#/components/responses/NotFound" }
 
+  /pages:
+    post:
+      tags: [pages]
+      operationId: createPage
+      summary: Publish a read-only shared page.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreatePageRequest" }
+      responses:
+        "201":
+          description: Published page metadata and share URL.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PageResponse" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/PolicyDenied" }
+    get:
+      tags: [pages]
+      operationId: listPages
+      summary: List shared pages owned by the current user.
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Page list.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PageListResponse" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+
+  /pages/public/{slug}:
+    parameters:
+      - name: slug
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [pages]
+      operationId: getPublicPage
+      summary: Read public shared page data for frontend rendering.
+      responses:
+        "200":
+          description: Shared page metadata and artifact content.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PublicPageResponse" }
+        "403": { $ref: "#/components/responses/PolicyDenied" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /pages/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [pages]
+      operationId: getPage
+      summary: Read shared page metadata.
+      responses:
+        "200":
+          description: Page metadata.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PageResponse" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [pages]
+      operationId: updatePage
+      summary: Update shared page metadata.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdatePageRequest" }
+      responses:
+        "200":
+          description: Updated page metadata.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PageResponse" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/VersionConflict" }
+    delete:
+      tags: [pages]
+      operationId: unpublishPage
+      summary: Unpublish a shared page.
+      responses:
+        "204": { description: Page unpublished. }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /pages/{id}/versions:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      tags: [pages]
+      operationId: createPageVersion
+      summary: Publish a new read-only version for an existing shared page.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreatePageVersionRequest" }
+      responses:
+        "201":
+          description: Updated page metadata.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PageResponse" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/VersionConflict" }
+
   /memories/import:
     post:
       tags: [transfer]
@@ -217,6 +384,11 @@ components:
       description: Required for auto-write and bulk import to dedupe repeated submissions.
 
   responses:
+    InvalidRequest:
+      description: Invalid request.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
     Unauthenticated:
       description: Missing or invalid credentials.
       content:
@@ -284,8 +456,70 @@ components:
     InjectionMode:
       type: string
       enum: [auto, confirm, manual_only, never]
+    PageKind:
+      type: string
+      enum: [html, markdown, pdf, docx, xlsx, pptx]
+    PageVisibility:
+      type: string
+      enum: [private, unlisted, public]
+    PageStatus:
+      type: string
+      enum: [active, unpublished, expired, deleted, quarantined]
+    PageSource:
+      type: string
+      enum: [api, mcp, cli, console, agent, import]
+    ExpiryUnit:
+      type: string
+      enum: [hours, days]
+    AuthProvider:
+      type: string
+      enum: [google, github]
 
     # --- requests / responses ---
+    AuthLoginRequest:
+      type: object
+      required: [provider, provider_user_id, email, name, mock_access_token]
+      properties:
+        provider: { $ref: "#/components/schemas/AuthProvider" }
+        provider_user_id: { type: string }
+        email: { type: string }
+        name: { type: string }
+        avatar_url: { type: string }
+        mock_access_token:
+          type: string
+          description: Temporary provider credential used by the local mock OAuth buttons.
+      additionalProperties: false
+
+    AuthUser:
+      type: object
+      required: [id, tenant_id, provider, provider_user_id, email, name]
+      properties:
+        id: { type: string }
+        tenant_id: { type: string }
+        provider: { $ref: "#/components/schemas/AuthProvider" }
+        provider_user_id: { type: string }
+        email: { type: string }
+        name: { type: string }
+        avatar_url: { type: string }
+      additionalProperties: false
+
+    AuthLoginResponse:
+      type: object
+      required: [access_token, token_type, expires_at, user]
+      properties:
+        access_token: { type: string }
+        token_type: { type: string, enum: [Bearer] }
+        expires_at: { type: string, format: date-time }
+        user: { $ref: "#/components/schemas/AuthUser" }
+      additionalProperties: false
+
+    AuthMeResponse:
+      type: object
+      required: [user]
+      properties:
+        user: { $ref: "#/components/schemas/AuthUser" }
+      additionalProperties: false
+
     CreateMemoryRequest:
       type: object
       required: [scope, type, content, source]
@@ -451,6 +685,108 @@ components:
           items: { type: string }
       additionalProperties: false
 
+    ExpiresIn:
+      type: object
+      required: [value, unit]
+      properties:
+        value: { type: integer, minimum: 1 }
+        unit: { $ref: "#/components/schemas/ExpiryUnit" }
+      additionalProperties: false
+
+    CreatePageRequest:
+      type: object
+      required: [title, kind]
+      properties:
+        title: { type: string }
+        kind: { $ref: "#/components/schemas/PageKind" }
+        content: { type: string }
+        content_base64: { type: string }
+        filename: { type: string }
+        description: { type: string }
+        visibility: { $ref: "#/components/schemas/PageVisibility" }
+        expires_in: { $ref: "#/components/schemas/ExpiresIn" }
+        ttl_hours:
+          type: integer
+          description: Deprecated compatibility alias for expires_in hours.
+        source: { $ref: "#/components/schemas/PageSource" }
+      additionalProperties: false
+
+    UpdatePageRequest:
+      type: object
+      required: [version]
+      properties:
+        title: { type: string }
+        description: { type: [string, "null"] }
+        visibility: { $ref: "#/components/schemas/PageVisibility" }
+        expires_at: { type: [string, "null"], format: date-time }
+        status: { $ref: "#/components/schemas/PageStatus" }
+        version: { type: integer }
+      additionalProperties: false
+
+    CreatePageVersionRequest:
+      type: object
+      required: [version]
+      properties:
+        content: { type: string }
+        content_base64: { type: string }
+        filename: { type: string }
+        version: { type: integer }
+      additionalProperties: false
+
+    PageResponse:
+      type: object
+      required:
+        [
+          id,
+          slug,
+          title,
+          description,
+          kind,
+          url,
+          visibility,
+          status,
+          expires_at,
+          created_at,
+          updated_at,
+          version,
+        ]
+      properties:
+        id: { type: string }
+        slug: { type: string }
+        title: { type: string }
+        description: { type: [string, "null"] }
+        kind: { $ref: "#/components/schemas/PageKind" }
+        url: { type: string }
+        visibility: { $ref: "#/components/schemas/PageVisibility" }
+        status: { $ref: "#/components/schemas/PageStatus" }
+        expires_at: { type: [string, "null"], format: date-time }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        version: { type: integer }
+      additionalProperties: false
+
+    PageListResponse:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/PageResponse" }
+        next_cursor: { type: [string, "null"] }
+      additionalProperties: false
+
+    PublicPageResponse:
+      allOf:
+        - $ref: "#/components/schemas/PageResponse"
+        - type: object
+          required: [content, filename, mime_type, size_bytes]
+          properties:
+            content: { type: string }
+            filename: { type: [string, "null"] }
+            mime_type: { type: string }
+            size_bytes: { type: integer }
+          additionalProperties: false
+
     OmittedMemory:
       type: object
       required: [memory_id, reason]
@@ -548,6 +884,14 @@ components:
                 - version_conflict
                 - classification_required
                 - rate_limited
+                - unsupported_artifact_type
+                - artifact_too_large
+                - invalid_artifact
+                - share_policy_denied
+                - page_not_found
+                - page_version_conflict
+                - render_failed
+                - page_quarantined
                 - internal
             message: { type: string }
             decision_id:

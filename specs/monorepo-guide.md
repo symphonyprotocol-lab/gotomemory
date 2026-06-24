@@ -64,7 +64,7 @@ gotomemory/
 │   ├── gateway/               # Memory Gateway API（系统规格 §7.1）
 │   ├── mcp-server/            # MCP Server（系统规格 §16.1）
 │   ├── cli/                   # gotomemory CLI，亦作 skill 底层（系统规格 §16.5）
-│   ├── console/               # 用户控制台 Web（M4）
+│   ├── console/               # 统一 Web：主站入口、用户控制台、分享页管理与 /p/{slug} 展示
 │   └── extension/             # 浏览器扩展（系统规格 §16.2）
 ├── packages/                  # 内部 TS 库（除 sdk-ts 外均不发布）
 │   ├── contracts/             # OpenAPI + JSON Schema：API/数据/策略契约的单一真相源
@@ -74,6 +74,7 @@ gotomemory/
 │   ├── db/                    # schema、迁移、仓储层（§8）
 │   ├── crypto/                # envelope 加密、密钥管理、脱敏（§13.1/§13.3）
 │   ├── audit/                 # 审计写入与哈希链（§7.6/§8.6）
+│   ├── pages/                 # 共享页面领域逻辑：存储、元数据、权限、TTL（不做前端渲染）
 │   ├── sdk-ts/                # TypeScript SDK（对外发布，§16.3）
 │   ├── config-ts/            # 共享 tsconfig / eslint / prettier 预设
 │   └── testing/               # 共享测试工具与 fixtures

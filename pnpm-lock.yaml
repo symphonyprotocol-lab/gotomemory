@@ -136,6 +136,9 @@ importers:
       '@gotomemory/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@gotomemory/pages':
+        specifier: workspace:*
+        version: link:../../packages/pages
       fastify:
         specifier: ^5.1.0
         version: 5.8.5
@@ -207,6 +210,8 @@ importers:
   packages/crypto: {}
 
   packages/db: {}
+
+  packages/pages: {}
 
   packages/policy: {}
 

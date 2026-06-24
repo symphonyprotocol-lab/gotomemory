@@ -46,4 +46,55 @@ describe("sdk createClient", () => {
     const client = createClient({ ...opts, fetch: stubFetch(204, undefined) });
     await expect(client.memories.delete("m1")).resolves.toBeUndefined();
   });
+
+  it("supports auth login without an existing token", async () => {
+    const client = createClient({
+      baseUrl: "http://x/v1",
+      fetch: stubFetch(201, {
+        access_token: "gtms_test",
+        token_type: "Bearer",
+        expires_at: "2026-07-01T00:00:00.000Z",
+        user: {
+          id: "usr_google_mock-google-user-1",
+          tenant_id: "t1",
+          provider: "google",
+          provider_user_id: "mock-google-user-1",
+          email: "user@gmail.com",
+          name: "Google User",
+        },
+      }),
+    });
+    const res = await client.auth.login({
+      provider: "google",
+      provider_user_id: "mock-google-user-1",
+      email: "user@gmail.com",
+      name: "Google User",
+      mock_access_token: "mock_google_local_credential",
+    });
+    expect(res.access_token).toBe("gtms_test");
+    expect(res.user.provider).toBe("google");
+  });
+
+  it("supports pages methods", async () => {
+    const client = createClient({
+      ...opts,
+      fetch: stubFetch(201, {
+        id: "pg_1",
+        slug: "s1",
+        title: "Page",
+        description: null,
+        kind: "html",
+        url: "http://pages/p/s1",
+        visibility: "unlisted",
+        status: "active",
+        expires_at: null,
+        created_at: "2026-06-24T00:00:00.000Z",
+        updated_at: "2026-06-24T00:00:00.000Z",
+        version: 1,
+      }),
+    });
+    const page = await client.pages.create({ title: "Page", kind: "html", content: "<h1>x</h1>" });
+    expect(page.id).toBe("pg_1");
+    expect(page.expires_at).toBeNull();
+  });
 });

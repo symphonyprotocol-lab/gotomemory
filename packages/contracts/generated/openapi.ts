@@ -4,6 +4,57 @@
  */
 
 export interface paths {
+    "/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create a user session from a provider credential. */
+        post: operations["login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read the current authenticated user. */
+        get: operations["getCurrentUser"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke the current session token. */
+        post: operations["logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/memories": {
         parameters: {
             query?: never;
@@ -93,6 +144,83 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/pages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List shared pages owned by the current user. */
+        get: operations["listPages"];
+        put?: never;
+        /** Publish a read-only shared page. */
+        post: operations["createPage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pages/public/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        /** Read public shared page data for frontend rendering. */
+        get: operations["getPublicPage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/pages/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        /** Read shared page metadata. */
+        get: operations["getPage"];
+        put?: never;
+        post?: never;
+        /** Unpublish a shared page. */
+        delete: operations["unpublishPage"];
+        options?: never;
+        head?: never;
+        /** Update shared page metadata. */
+        patch: operations["updatePage"];
+        trace?: never;
+    };
+    "/pages/{id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Publish a new read-only version for an existing shared page. */
+        post: operations["createPageVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/memories/import": {
         parameters: {
             query?: never;
@@ -154,6 +282,47 @@ export interface components {
         Action: "create" | "read" | "update" | "delete" | "inject" | "export";
         /** @enum {string} */
         InjectionMode: "auto" | "confirm" | "manual_only" | "never";
+        /** @enum {string} */
+        PageKind: "html" | "markdown" | "pdf" | "docx" | "xlsx" | "pptx";
+        /** @enum {string} */
+        PageVisibility: "private" | "unlisted" | "public";
+        /** @enum {string} */
+        PageStatus: "active" | "unpublished" | "expired" | "deleted" | "quarantined";
+        /** @enum {string} */
+        PageSource: "api" | "mcp" | "cli" | "console" | "agent" | "import";
+        /** @enum {string} */
+        ExpiryUnit: "hours" | "days";
+        /** @enum {string} */
+        AuthProvider: "google" | "github";
+        AuthLoginRequest: {
+            provider: components["schemas"]["AuthProvider"];
+            provider_user_id: string;
+            email: string;
+            name: string;
+            avatar_url?: string;
+            /** @description Temporary provider credential used by the local mock OAuth buttons. */
+            mock_access_token: string;
+        };
+        AuthUser: {
+            id: string;
+            tenant_id: string;
+            provider: components["schemas"]["AuthProvider"];
+            provider_user_id: string;
+            email: string;
+            name: string;
+            avatar_url?: string;
+        };
+        AuthLoginResponse: {
+            access_token: string;
+            /** @enum {string} */
+            token_type: "Bearer";
+            /** Format: date-time */
+            expires_at: string;
+            user: components["schemas"]["AuthUser"];
+        };
+        AuthMeResponse: {
+            user: components["schemas"]["AuthUser"];
+        };
         CreateMemoryRequest: {
             scope: components["schemas"]["Scope"];
             type: components["schemas"]["MemoryType"];
@@ -255,6 +424,65 @@ export interface components {
             confirmation_token: string;
             confirmed_memory_ids: string[];
         };
+        ExpiresIn: {
+            value: number;
+            unit: components["schemas"]["ExpiryUnit"];
+        };
+        CreatePageRequest: {
+            title: string;
+            kind: components["schemas"]["PageKind"];
+            content?: string;
+            content_base64?: string;
+            filename?: string;
+            description?: string;
+            visibility?: components["schemas"]["PageVisibility"];
+            expires_in?: components["schemas"]["ExpiresIn"];
+            /** @description Deprecated compatibility alias for expires_in hours. */
+            ttl_hours?: number;
+            source?: components["schemas"]["PageSource"];
+        };
+        UpdatePageRequest: {
+            title?: string;
+            description?: string | null;
+            visibility?: components["schemas"]["PageVisibility"];
+            /** Format: date-time */
+            expires_at?: string | null;
+            status?: components["schemas"]["PageStatus"];
+            version: number;
+        };
+        CreatePageVersionRequest: {
+            content?: string;
+            content_base64?: string;
+            filename?: string;
+            version: number;
+        };
+        PageResponse: {
+            id: string;
+            slug: string;
+            title: string;
+            description: string | null;
+            kind: components["schemas"]["PageKind"];
+            url: string;
+            visibility: components["schemas"]["PageVisibility"];
+            status: components["schemas"]["PageStatus"];
+            /** Format: date-time */
+            expires_at: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+            version: number;
+        };
+        PageListResponse: {
+            items: components["schemas"]["PageResponse"][];
+            next_cursor: string | null;
+        };
+        PublicPageResponse: components["schemas"]["PageResponse"] & {
+            content: string;
+            filename: string | null;
+            mime_type: string;
+            size_bytes: number;
+        };
         OmittedMemory: {
             memory_id: string;
             /**
@@ -312,7 +540,7 @@ export interface components {
         Error: {
             error: {
                 /** @enum {string} */
-                code: "invalid_request" | "unauthenticated" | "policy_denied" | "not_found" | "version_conflict" | "classification_required" | "rate_limited" | "internal";
+                code: "invalid_request" | "unauthenticated" | "policy_denied" | "not_found" | "version_conflict" | "classification_required" | "rate_limited" | "unsupported_artifact_type" | "artifact_too_large" | "invalid_artifact" | "share_policy_denied" | "page_not_found" | "page_version_conflict" | "render_failed" | "page_quarantined" | "internal";
                 message: string;
                 decision_id?: string | null;
                 details?: {
@@ -322,6 +550,15 @@ export interface components {
         };
     };
     responses: {
+        /** @description Invalid request. */
+        InvalidRequest: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
         /** @description Missing or invalid credentials. */
         Unauthenticated: {
             headers: {
@@ -389,6 +626,71 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuthLoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Authenticated session. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthLoginResponse"];
+                };
+            };
+            400: components["responses"]["InvalidRequest"];
+        };
+    };
+    getCurrentUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current user. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthMeResponse"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+        };
+    };
+    logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Session revoked. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+        };
+    };
     createMemory: {
         parameters: {
             query?: never;
@@ -581,6 +883,183 @@ export interface operations {
             401: components["responses"]["Unauthenticated"];
             403: components["responses"]["PolicyDenied"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    listPages: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Page list. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageListResponse"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+        };
+    };
+    createPage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePageRequest"];
+            };
+        };
+        responses: {
+            /** @description Published page metadata and share URL. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponse"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            403: components["responses"]["PolicyDenied"];
+        };
+    };
+    getPublicPage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Shared page metadata and artifact content. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicPageResponse"];
+                };
+            };
+            403: components["responses"]["PolicyDenied"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getPage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Page metadata. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponse"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    unpublishPage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Page unpublished. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updatePage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePageRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated page metadata. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponse"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["VersionConflict"];
+        };
+    };
+    createPageVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePageVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated page metadata. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponse"];
+                };
+            };
+            401: components["responses"]["Unauthenticated"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["VersionConflict"];
         };
     };
     importMemories: {

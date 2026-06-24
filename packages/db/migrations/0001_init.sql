@@ -3,6 +3,35 @@
 
 CREATE EXTENSION IF NOT EXISTS vector;
 
+CREATE TABLE auth_users (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  provider_user_id TEXT NOT NULL,
+  email TEXT NOT NULL,
+  name TEXT NOT NULL,
+  avatar_url TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (provider IN ('google', 'github')),
+  UNIQUE (provider, provider_user_id)
+);
+
+CREATE INDEX ix_auth_users_tenant ON auth_users (tenant_id);
+CREATE INDEX ix_auth_users_email ON auth_users (email);
+
+CREATE TABLE auth_sessions (
+  token TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES auth_users(id) ON DELETE CASCADE,
+  tenant_id TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at TIMESTAMPTZ NOT NULL,
+  revoked_at TIMESTAMPTZ
+);
+
+CREATE INDEX ix_auth_sessions_user ON auth_sessions (user_id);
+CREATE INDEX ix_auth_sessions_expires ON auth_sessions (expires_at);
+
 CREATE TABLE memory_collections (
   id UUID PRIMARY KEY,
   tenant_id UUID NOT NULL,

@@ -89,4 +89,61 @@
     color: var(--foreground);
     -webkit-font-smoothing: antialiased;
   }
+
+  .shared-page-content {
+    font-size: 0.95rem;
+    line-height: 1.7;
+  }
+
+  .shared-page-frame {
+    width: 100%;
+    min-height: 720px;
+    border: 0;
+    background: #fff;
+    border-radius: 0.375rem;
+  }
+
+  .shared-page-content h1,
+  .shared-page-content h2,
+  .shared-page-content h3 {
+    margin: 1.25rem 0 0.5rem;
+    font-weight: 650;
+    line-height: 1.25;
+  }
+
+  .shared-page-content h1 {
+    font-size: 1.75rem;
+  }
+
+  .shared-page-content h2 {
+    font-size: 1.35rem;
+  }
+
+  .shared-page-content p,
+  .shared-page-content ul,
+  .shared-page-content pre,
+  .shared-page-content object {
+    margin: 0.85rem 0;
+  }
+
+  .shared-page-content ul {
+    padding-left: 1.25rem;
+    list-style: disc;
+  }
+
+  .shared-page-content pre {
+    overflow: auto;
+    border-radius: 0.5rem;
+    background: var(--muted);
+    padding: 1rem;
+  }
+
+  .shared-page-content code {
+    font-family:
+      ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  }
+
+  .homepage-preview {
+    min-height: 420px;
+  }
 }

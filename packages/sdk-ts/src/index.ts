@@ -1,13 +1,23 @@
 import type {
+  AuthLoginRequest,
+  AuthLoginResponse,
+  AuthMeResponse,
+  AuthProvider,
   ContextBuildRequest,
   ContextBuildResponse,
   ContextConfirmRequest,
+  CreatePageRequest,
+  CreatePageVersionRequest,
   CreateMemoryRequest,
   CreateMemoryResponse,
   MemoryRead,
+  PageListResponse,
+  PageResponse,
+  PublicPageResponse,
   paths,
   SearchRequest,
   SearchResponse,
+  UpdatePageRequest,
   UpdateMemoryRequest,
 } from "@gotomemory/contracts";
 import createOpenapiClient from "openapi-fetch";
@@ -16,7 +26,7 @@ export interface ClientOptions {
   /** Base URL including the API version, e.g. http://localhost:8787/v1 */
   baseUrl: string;
   /** Bearer token (OAuth access token or API token). */
-  token: string;
+  token?: string;
   /** Custom fetch (tests, proxies). Defaults to global fetch. */
   fetch?: typeof fetch;
 }
@@ -52,6 +62,11 @@ function unwrap<T>(result: Result<T>): T {
 }
 
 export interface GotomemoryClient {
+  auth: {
+    login(body: AuthLoginRequest): Promise<AuthLoginResponse>;
+    me(): Promise<AuthMeResponse>;
+    logout(): Promise<void>;
+  };
   memories: {
     create(body: CreateMemoryRequest): Promise<CreateMemoryResponse>;
     search(body: SearchRequest): Promise<SearchResponse>;
@@ -63,16 +78,37 @@ export interface GotomemoryClient {
     build(body: ContextBuildRequest): Promise<ContextBuildResponse>;
     confirm(body: ContextConfirmRequest): Promise<ContextBuildResponse>;
   };
+  pages: {
+    create(body: CreatePageRequest): Promise<PageResponse>;
+    list(limit?: number): Promise<PageListResponse>;
+    get(id: string): Promise<PageResponse>;
+    getPublic(slug: string): Promise<PublicPageResponse>;
+    update(id: string, body: UpdatePageRequest): Promise<PageResponse>;
+    createVersion(id: string, body: CreatePageVersionRequest): Promise<PageResponse>;
+    unpublish(id: string): Promise<void>;
+  };
 }
 
 export function createClient(options: ClientOptions): GotomemoryClient {
   const client = createOpenapiClient<paths>({
     baseUrl: options.baseUrl,
-    headers: { Authorization: `Bearer ${options.token}` },
+    headers: options.token ? { Authorization: `Bearer ${options.token}` } : {},
     ...(options.fetch ? { fetch: options.fetch } : {}),
   });
 
   return {
+    auth: {
+      async login(body) {
+        return unwrap(await client.POST("/auth/login", { body }));
+      },
+      async me() {
+        return unwrap(await client.GET("/auth/me"));
+      },
+      async logout() {
+        const result = await client.POST("/auth/logout");
+        if (result.error !== undefined) unwrap(result);
+      },
+    },
     memories: {
       async create(body) {
         return unwrap(await client.POST("/memories", { body }));
@@ -101,17 +137,57 @@ export function createClient(options: ClientOptions): GotomemoryClient {
         return unwrap(await client.POST("/context/confirm", { body }));
       },
     },
+    pages: {
+      async create(body) {
+        return unwrap(await client.POST("/pages", { body }));
+      },
+      async list(limit) {
+        return unwrap(
+          await client.GET("/pages", {
+            params: { query: { ...(limit === undefined ? {} : { limit }) } },
+          }),
+        );
+      },
+      async get(id) {
+        return unwrap(await client.GET("/pages/{id}", { params: { path: { id } } }));
+      },
+      async getPublic(slug) {
+        return unwrap(await client.GET("/pages/public/{slug}", { params: { path: { slug } } }));
+      },
+      async update(id, body) {
+        return unwrap(await client.PATCH("/pages/{id}", { params: { path: { id } }, body }));
+      },
+      async createVersion(id, body) {
+        return unwrap(
+          await client.POST("/pages/{id}/versions", { params: { path: { id } }, body }),
+        );
+      },
+      async unpublish(id) {
+        const result = await client.DELETE("/pages/{id}", { params: { path: { id } } });
+        if (result.error !== undefined) unwrap(result);
+      },
+    },
   };
 }
 
 export type {
+  AuthLoginRequest,
+  AuthLoginResponse,
+  AuthMeResponse,
+  AuthProvider,
   ContextBuildRequest,
   ContextBuildResponse,
   ContextConfirmRequest,
+  CreatePageRequest,
+  CreatePageVersionRequest,
   CreateMemoryRequest,
   CreateMemoryResponse,
   MemoryRead,
+  PageListResponse,
+  PageResponse,
+  PublicPageResponse,
   SearchRequest,
   SearchResponse,
+  UpdatePageRequest,
   UpdateMemoryRequest,
 } from "@gotomemory/contracts";

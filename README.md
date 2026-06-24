@@ -6,6 +6,8 @@ audited, and injected into ChatGPT, Claude, and Gemini contexts.
 ## Specs
 
 - [System spec](specs/memory-sharing-system.md) — what the system does.
+- [Share pages spec](specs/share-pages-system.md) — read-only artifact sharing for
+  generated HTML, Markdown, PDF, Word, Excel, and PowerPoint.
 - [Monorepo guide](specs/monorepo-guide.md) — how the code is organized.
 - [Overview](specs/overview.html) — static visual overview.
 

@@ -59,7 +59,13 @@ LOG="$(mktemp)"
 section "Starting gateway on :${PORT}  ${DIM}(${GW[*]})${RST}"
 PORT="$PORT" "${GW[@]}" >"$LOG" 2>&1 &
 GW_PID=$!
-cleanup() { kill "$GW_PID" 2>/dev/null; wait "$GW_PID" 2>/dev/null; rm -f "$LOG"; }
+cleanup() {
+  local status=$?
+  kill "$GW_PID" 2>/dev/null || true
+  wait "$GW_PID" 2>/dev/null || true
+  rm -f "$LOG"
+  return "$status"
+}
 trap cleanup EXIT
 
 for _ in $(seq 1 40); do
@@ -169,6 +175,21 @@ expect_eq "$(http_code -X DELETE "${BASE}/v1/memories/${NID}" \
   -H "authorization: Bearer ${GOTOMEMORY_TOKEN}")" "204" "DELETE → 204"
 AFTER=$(cli memory search typescript --json)
 expect_absent "$AFTER" "$NID" "deleted memory no longer returned by search"
+
+# ===========================================================================
+section "Scenario 8 — shared page: frontend URL + gateway JSON data"
+PAGE=$(echo '<h1 onclick="bad()">Share</h1><script>alert(1)</script>' |
+  cli pages publish --title "Share smoke" --kind html --expires 2h --json)
+PGID=$(echo "$PAGE" | jget id)
+PURL=$(echo "$PAGE" | jget url)
+PSLUG=$(echo "$PAGE" | jget slug)
+expect_contains "$PURL" "http://localhost:5173/p/" "share URL points to the Web Console frontend"
+PUBLIC=$(curl -s "${BASE}/v1/pages/public/${PSLUG}")
+expect_eq "$(echo "$PUBLIC" | jget kind)" "html" "public page data returns artifact metadata"
+expect_contains "$PUBLIC" "<script>" "gateway returns raw artifact data, not rendered HTML"
+expect_eq "$(http_code -X DELETE "${BASE}/v1/pages/${PGID}" \
+  -H "authorization: Bearer ${GOTOMEMORY_TOKEN}")" "204" "shared page unpublish → 204"
+expect_eq "$(http_code "${BASE}/v1/pages/public/${PSLUG}")" "404" "unpublished shared page data → 404"
 
 # ===========================================================================
 printf "\n${YEL}== Summary ==${RST}\n"
