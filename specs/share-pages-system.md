@@ -1,6 +1,6 @@
 # 对话分享系统规格设计（普通用户版）
 
-> 本规格面向**普通用户**：把一段 AI 对话**一键变成只读分享链接**发给别人看。范围已**降级**——只做"分享对话"，不做任意文件交付物发布（那挪到文末第 11 节高级层）。
+> 本规格面向**普通用户**：把一段 AI 对话**一键变成只读分享链接**发给别人看。范围已**降级**——只做"分享对话"，不做任意文件交付物发布（那挪到文末第 14 节高级层）。
 >
 > 分享对象就是用户正在看的对话：可以分享**完整对话**，也可以在对话里**勾选**要分享的消息。生成的是一个**对话级**只读页面，可**公开**或用**密码保护**。
 
@@ -23,7 +23,7 @@
 ## 3. 非目标
 
 - 不做在线编辑、多人协同、评论。
-- 不做任意文件交付物发布（HTML/PDF/Word/Excel/PPT 上传）——降级到第 11 节高级层。
+- 不做任意文件交付物发布（HTML/PDF/Word/Excel/PPT 上传）——降级到第 14 节高级层。
 - 不做对话档案馆/自动存档（见 memory-sharing-system.md §3）。分享是用户主动的一次性动作。
 - 不默认让搜索引擎索引分享页。
 - 不自动把分享内容存成记忆。
@@ -36,7 +36,7 @@
 
 | 字段 | 含义 |
 | --- | --- |
-| `title` | 标题（默认取对话首条消息，可改） |
+| `title` | 标题（可改）。**默认不直接取对话首条消息原文**——首条消息可能含敏感内容，而标题对密码页未解锁者也可见（见 §7.4）。默认用中性占位（如「Claude 对话 · 06-25」），用户想用原文做标题需手动确认 |
 | `url` | 分享链接（含不可猜测的 `slug`） |
 | `visibility` | `public`（有链接即可看）/ `password`（要密码） |
 | `expires_at` | 到期时间，不设则永久 |
@@ -72,7 +72,10 @@
 
 ### 5.3 有效期
 
-发布时可选有效期（几小时 / 几天 / 永久）。到期后链接返回"已过期"，内容清理。不设则永久，直到本人下线删除。
+发布时可选有效期（几小时 / 几天 / 永久）。不设则永久，直到本人下线删除。到期处理分两步：
+
+- **读路径即时判定**：任何访问先比对 `expires_at`，已过期立刻当作失效返回（不依赖清理任务的及时性），所以过期内容不会因清理延迟而被读到。
+- **后台清理任务**：一个定时任务（cron / 定期 worker）把过期记录的 `status` 置 `expired` 并物理删除消息正文（或对象存储里的 object）。`view_count` 自增走异步/原子计数，避免热门公开页在读路径上产生写竞争。
 
 ## 6. 隐私
 
@@ -81,6 +84,7 @@
 - 只有用户点了"分享"、选定的消息才会上传并发布，原对话的其余部分不动。
 - 公开页任何拿到链接的人都能看；要更私密就用**密码保护**，并可加**有效期**。
 - 密码只存哈希（见 9.1），不存明文。
+- **「密码保护」= 访问控制，不是内容加密**：被分享的消息在服务端是**明文落库**（仅密码本身被哈希），运维和数据库备份对内容可见。这与记忆/同步追求的端到端加密不同，必须在 UI 如实告知，避免用户把「密码」误解为"连 gotomemory 也看不到"。真正不想让我们看到的内容，就别分享。
 - 用户可随时下线/删除分享，链接立即失效。
 - 默认不允许搜索引擎索引。
 
@@ -115,7 +119,7 @@
 ```json
 {
   "id": "sc_abc123",
-  "url": "https://gotomemory.dev/p/r7K2mQ",
+  "url": "https://gotomemory.dev/p/Kp7mQ2xR9vL4nT8wB3cF6dH1",
   "visibility": "password",
   "status": "active",
   "expires_at": "2026-06-26T00:00:00Z"
@@ -143,7 +147,7 @@ DELETE /v1/shares/{id}     # 链接立即失效
 `GET /v1/shares/public/{slug}`
 
 - `public`：直接返回对话内容 + 元数据。
-- `password`：只返回"需要密码"标记和标题，不返回内容。
+- `password`：只返回"需要密码"标记和标题，不返回任何消息内容。**注意标题本身对未解锁者可见**，所以密码分享的标题默认用中性占位（见 §4.1），不得回落到首条消息原文。
 - 过期/删除：返回明确状态。
 
 ### 7.5 密码解锁
@@ -154,13 +158,13 @@ DELETE /v1/shares/{id}     # 链接立即失效
 { "password": "用户输入的密码" }
 ```
 
-服务端比对哈希，通过则返回对话内容（或一个短期有效的查看令牌）。失败计入限流，防暴力破解。
+服务端比对哈希，通过则**返回一个短期查看令牌**（如有效期 30 分钟的签名 token / httpOnly cookie），客户端凭它再调 `GET /v1/shares/public/{slug}` 拿内容；不在解锁响应里直接夹带正文，避免日志/缓存层留存明文，也便于令牌过期后自动锁回。失败计入限流，防暴力破解。
 
 ## 8. 客户端形态
 
 ### 8.1 浏览器扩展（主入口）
 
-分享按钮就在对话页，复用 6.1/6.2 的消息选择。这是普通用户的唯一分享入口。
+分享按钮就在对话页，复用 memory-sharing-system.md §6.1/§6.2 的消息选择。这是普通用户的唯一分享入口。
 
 ### 8.2 Web 入口
 
@@ -179,7 +183,7 @@ DELETE /v1/shares/{id}     # 链接立即失效
 
 - 密码只存**哈希**（如 scrypt/bcrypt/argon2），绝不存明文、不进日志。
 - 解锁接口**限流**，防暴力破解。
-- `slug` 不可猜测，至少 128 bit 随机；即便公开页也靠不可枚举的 slug，不暴露顺序 ID。
+- `slug` 不可猜测：至少 128 bit 随机熵，编码后约 22+ 个 base62 字符（例：`Kp7mQ2xR9vL4nT8wB3cF6dH1`）。即便公开页也只靠不可枚举的 slug 防护，绝不暴露顺序 ID。**示例 URL 必须与此长度一致**——短到 6~8 字符（≈35~48 bit）可被枚举，不合格。
 - 私有（密码）页未解锁前，公开数据接口不返回任何消息内容。
 
 ### 9.2 只读渲染
@@ -187,11 +191,12 @@ DELETE /v1/shares/{id}     # 链接立即失效
 - 对话内容（多为 Markdown）渲染前**必须经 sanitizer**：禁 `<script>`、去事件属性、去危险 URL。
 - 严格 CSP（`script-src 'none'` 等，沿用下表）。
 - 代码块只展示不执行。
+- **不允许加载任意外链图片**：对话 Markdown 里若含外部图片 URL（或发布者故意埋的追踪像素），访客一打开页面就会向第三方服务器发请求，泄露访客 IP/UA。因此 `img-src` 不放开 `https:`；外链图片要么在发布时**由我们的服务端代理/落地缓存**后改写为 `'self'` 资源，要么直接不渲染（显示占位）。
 
 ```http
 Content-Security-Policy:
   default-src 'none';
-  img-src 'self' data: https:;
+  img-src 'self' data:;
   style-src 'self' 'unsafe-inline';
   font-src 'self' data:;
   script-src 'none';
@@ -217,7 +222,8 @@ CREATE TABLE shared_conversations (
   slug            TEXT NOT NULL UNIQUE,
   title           TEXT NOT NULL,
   source_platform TEXT,                         -- chatgpt | claude | gemini
-  messages        TEXT NOT NULL,                -- JSON: [{role, content}]，或指向存储的 object_key
+  messages_json   TEXT,                         -- 小内容：内联 JSON [{role, content}]
+  messages_object_key TEXT,                      -- 大内容：指向对象存储的 key（开发期本地 FS，生产 S3/R2/GCS）
   visibility      TEXT NOT NULL DEFAULT 'public',-- public | password
   password_hash   TEXT,                         -- visibility=password 时非空
   status          TEXT NOT NULL DEFAULT 'active',-- active | expired | deleted
@@ -226,11 +232,13 @@ CREATE TABLE shared_conversations (
   created_at      TIMESTAMP NOT NULL DEFAULT now(),
   CHECK (visibility IN ('public','password')),
   CHECK (status IN ('active','expired','deleted')),
-  CHECK (visibility = 'public' OR password_hash IS NOT NULL)
+  CHECK (visibility = 'public' OR password_hash IS NOT NULL),
+  -- 消息内容二选一存放：小则内联 JSON，大则放对象存储；恰有一个非空
+  CHECK ((messages_json IS NOT NULL) <> (messages_object_key IS NOT NULL))
 );
 ```
 
-消息内容较大时可存对象存储（开发期本地文件系统，生产用 S3/R2/GCS），表里存 `object_key`。
+消息内容较小时内联在 `messages_json`；较大时落对象存储（开发期本地文件系统，生产用 S3/R2/GCS），表里只留 `messages_object_key`。两者互斥，恰有一个非空。
 
 ## 11. 默认配置
 
