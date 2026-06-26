@@ -1,16 +1,5 @@
 import type { ConversationMessage } from "@gotomemory/contracts";
 
-export const SHARE_PAGE_CSP = [
-  "default-src 'none'",
-  "img-src 'self' data:",
-  "style-src 'self' 'unsafe-inline'",
-  "font-src 'self' data:",
-  "script-src 'none'",
-  "frame-ancestors 'none'",
-  "base-uri 'none'",
-  "form-action 'none'"
-].join("; ");
-
 export function renderConversationHtml(messages: ConversationMessage[]): string {
   const body = messages
     .map(

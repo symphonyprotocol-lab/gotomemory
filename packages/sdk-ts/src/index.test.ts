@@ -7,23 +7,36 @@ describe("TypeScript SDK", () => {
     expect(buildContextPrompt([{ content: "Use TypeScript" }])).toContain("Use TypeScript");
   });
 
-  it("creates conversation shares through the generated client", async () => {
+  it("saves memories through the generated client", async () => {
+    let captured: { url: string; method: string; body: string } | undefined;
     const sdk = new GotomemorySdk({
       baseUrl: "https://api.test",
-      fetch: async () =>
-        new Response(
+      fetch: async (input, init) => {
+        captured = {
+          url: String(input),
+          method: init?.method ?? "GET",
+          body: String(init?.body ?? "")
+        };
+        return new Response(
           JSON.stringify({
-            id: "sc_1",
-            url: "https://gotomemory.dev/p/abcdefghijklmnopqrstuv",
-            visibility: "public",
-            status: "active",
-            expires_at: null
+            id: "mem_1",
+            user_id: "local",
+            content: "Use TypeScript",
+            category: "preference",
+            is_private: false,
+            source: "chatgpt",
+            rev: 0,
+            created_at: "2026-06-25T00:00:00.000Z",
+            updated_at: "2026-06-25T00:00:00.000Z"
           })
-        )
+        );
+      }
     });
 
     await expect(
-      sdk.shareConversation([{ role: "assistant", content: "done" }], "Demo")
-    ).resolves.toMatchObject({ id: "sc_1" });
+      sdk.saveMemory({ content: "Use TypeScript", source: "chatgpt" })
+    ).resolves.toMatchObject({ id: "mem_1" });
+    expect(captured?.method).toBe("POST");
+    expect(captured?.url).toBe("https://api.test/v1/memories");
   });
 });

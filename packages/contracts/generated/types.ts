@@ -1,8 +1,6 @@
 export type Platform = "chatgpt" | "claude" | "gemini";
 export type MemorySource = Platform | "manual" | "import";
 export type MemoryCategory = "preference" | "fact" | "project" | "other";
-export type ShareVisibility = "public" | "password";
-export type ShareStatus = "active" | "expired" | "deleted";
 export type ConversationRole = "user" | "assistant";
 
 export interface Memory {
@@ -63,78 +61,21 @@ export interface ConversationMessage {
   content: string;
 }
 
-export interface SharedConversation {
+export interface SyncMemoryEnvelope {
   id: string;
   user_id: string;
-  slug: string;
-  title: string;
-  source_platform?: Platform;
-  messages: ConversationMessage[];
-  visibility: ShareVisibility;
-  status: ShareStatus;
-  expires_at?: string | null;
-  view_count: number;
-  created_at: string;
+  rev: number;
+  ciphertext: string;
+  iv: string;
+  salt: string;
+  updated_at: string;
+  deleted_at?: string | null;
 }
 
-export interface CreateShareRequest {
-  title?: string;
-  source_platform?: Platform;
-  messages: ConversationMessage[];
-  visibility?: ShareVisibility;
-  password?: string;
-  expires_in_hours?: number;
+export interface SyncPushResponse {
+  accepted: number;
 }
 
-export interface CreateShareResponse {
-  id: string;
-  url: string;
-  visibility: ShareVisibility;
-  status: ShareStatus;
-  expires_at?: string | null;
-}
-
-export interface ShareListResponse {
-  shares: SharedConversation[];
-}
-
-export interface UpdateShareRequest {
-  title?: string;
-  visibility?: ShareVisibility;
-  password?: string | null;
-  expires_at?: string | null;
-  status?: ShareStatus;
-}
-
-export interface PublicShareLockedResponse {
-  status: "password_required";
-  title: string;
-  visibility: "password";
-}
-
-export interface PublicShareResponse {
-  status: "ok";
-  share: SharedConversation;
-}
-
-export interface UnlockShareRequest {
-  password: string;
-}
-
-export interface UnlockShareResponse {
-  view_token: string;
-  expires_at: string;
-}
-
-export interface ApiError {
-  error: {
-    code:
-      | "bad_request"
-      | "unauthorized"
-      | "password_required"
-      | "invalid_password"
-      | "share_not_found"
-      | "rate_limited";
-    message: string;
-  };
+export interface SyncPullResponse {
+  envelopes: SyncMemoryEnvelope[];
 }

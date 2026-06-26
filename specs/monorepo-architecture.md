@@ -35,8 +35,7 @@
 gotomemory/
 ├─ apps/
 │  ├─ extension/         @gotomemory/extension     P0 产品本体（WXT/MV3）
-│  ├─ web/               @gotomemory/web            Web：首页
-│  └─ share-server/      @gotomemory/share-server   遗留分享链接服务（已取消，待删除或归档）
+│  └─ web/               @gotomemory/web            Web：首页
 │
 ├─ packages/
 │  ├─ config-ts/         @gotomemory/config-ts      tsconfig/eslint/prettier 预设（已存在引用）
@@ -78,17 +77,16 @@ gotomemory/
 | `ui` | 适配 | 跨外壳共享的 React 组件 | 浏览器 | `contracts`、`render` | private |
 | `extension` | 应用 | 组合根：content script + background store + popup/options | 浏览器扩展(MV3) | 任意 `packages/*` | private |
 | `web` | 应用 | Web：`/` 首页 | 浏览器(Vite/React) | 无业务包 | private |
-| `share-server` | 应用 | 遗留分享 API（分享链接功能已取消，待删除或归档） | Node 22 | **仅 `contracts`** | private |
 | `py/sdk` | 高级层 | Python SDK（开发者/Agent 接入） | Python(uv) | —（独立工具链） | PyPI(后续) |
 
-关键约束：**`share-server` 只依赖 `contracts`**。`core/store/retrieval/export` 是客户端本地能力，服务端不碰它们——这从代码层面坐实"记忆/检索不在我们服务器上跑"。
+关键约束：**`core/store/retrieval/export` 是客户端本地能力**，记忆与检索都在用户本机跑，不存在服务端业务逻辑——这从代码层面坐实"记忆/检索不在我们服务器上跑"。同步服务若上线，应作为单独服务设计，只复用 `contracts` 契约。
 
 ## 5. 依赖边界规则（机器强制）
 
 方向：`apps → packages`，`packages` 内部按层 `应用 ? 适配 ? 领域 ? 契约`，`contracts` 是叶子。
 
 ```
-应用层    extension / web / share-server
+应用层    extension / web
    │  （只能向下依赖 packages，app 之间互不依赖）
    ▼
 适配层    site-adapters / ui            ← 触碰 DOM / React 的隔离带
@@ -105,7 +103,6 @@ gotomemory/
 - **no-app-to-app**：`apps/*` 之间禁止相互 import。
 - **domain-is-platform-agnostic**：`core`/`store`/`retrieval`/`export`/`render` 内**禁止** import `chrome`、`webextension-polyfill`、`react`、`node:*`（`store` 的扩展实现除外，见下）、以及任何 `apps/*`。它们必须能在 vitest(Node) 里裸跑。
 - **dom-only-in-adapters**：直接操作站点 DOM 的代码只允许出现在 `site-adapters`。`core` 不得读写页面。
-- **server-isolation**：`share-server` 只能依赖 `contracts`；import `core/store/retrieval/export` 即报错。
 - **no-cycles**：禁止任何循环依赖。
 - **contracts-is-leaf**：`contracts` 不得依赖任何 `@gotomemory/*`。
 
@@ -156,7 +153,7 @@ apps/extension/
 - 捕获默认「建议保存」：site-adapter 用 **DOM content script 读渲染内容**，绝不 override `fetch`/`XHR`（memory 规格 §6.1 隐私纪律）。
 - host 权限精确到 `chatgpt.com` / `claude.ai` / `gemini.google.com`，写进商店说明。
 
-## 8. Web 与服务端
+## 8. Web 端
 
 ### 8.1 `apps/web`（Vite/React，端口 5173）
 
@@ -168,9 +165,7 @@ Web 端只提供产品首页：
 
 默认不做 Web 端记忆管理页：纯本地记忆在扩展 background 的存储里，普通网页读不到，也不应诱导用户上传记忆。记忆管理放在扩展 options/popup。分享链接功能已取消，Web 端不提供公开分享页或分享管理页。
 
-### 8.2 `apps/share-server`（遗留，待删除或归档）
-
-分享链接功能已取消，当前 `apps/share-server` 只是遗留脚手架。后续应删除该 app，或将其归档到非 MVP 高级实验区。同步服务若上线，应作为单独同步服务设计，不复用分享链接语义。
+> 没有独立服务端：记忆/检索/导出全在客户端本机完成。跨设备同步若上线，作为单独同步服务设计，只复用 `contracts` 契约（见 §9、memory 规格 §13），不在本骨架内。
 
 ## 9. 本地优先执行模型（代码层面）
 

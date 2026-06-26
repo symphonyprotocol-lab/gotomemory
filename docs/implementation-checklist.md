@@ -1,7 +1,8 @@
 # gotomemory MVP Implementation Checklist
 
 > Source specs: `specs/monorepo-architecture.md`, `specs/memory-sharing-system.md`.
-> `specs/share-pages-system.md` is retained only as a cancellation note.
+> Share links are not a product feature; the share spec, share-server, and share contracts
+> have been removed.
 >
 > Rule for this checklist: every shipped feature point must have automated test coverage in the same package or app.
 
@@ -25,9 +26,10 @@
 - [x] Define OpenAPI and JSON Schema source locations for future code generation.
   - Implemented in `packages/contracts/openapi/*` and `packages/contracts/schemas/*`.
   - Covered by `packages/contracts/scripts/codegen.ts`.
-- [ ] Remove legacy share-link API client/types from contracts.
-  - Share links are no longer part of the product.
-  - Legacy implementation still exists and should be cleaned up separately.
+- [x] Remove legacy share-link API client/types from contracts.
+  - Share types/schemas/OpenAPI removed; `generated/client.ts` now exposes the memory
+    operations from `openapi/memory.yaml` (`/v1/memories`, `/v1/context`, pause/resume).
+  - Covered by `packages/contracts/src/validation.test.ts` and `packages/sdk-ts/src/index.test.ts`.
 
 ## Local Memory
 
@@ -64,9 +66,15 @@
 - [x] Add three site adapters for message extraction, prompt insertion, and UI mount discovery.
   - Implemented in `packages/site-adapters/src/index.ts`.
   - Covered by `packages/site-adapters/src/index.test.ts`.
-- [x] Add typed content-to-background messaging for save, context, pause, and resume.
+- [x] Add typed content-to-background messaging for save, search, context, update, delete, pause, and resume.
   - Implemented in `apps/extension/src/messaging.ts` and `apps/extension/src/handlers.ts`.
   - Covered by `apps/extension/src/messaging.test.ts`.
+- [x] Wire background to persistent chrome.storage so memories survive service-worker eviction.
+  - Implemented in `apps/extension/entrypoints/background.ts` via `PersistentJsonMemoryStore` + `ChromeStorageDriver`.
+  - Covered by `apps/extension/src/messaging.test.ts` ("persists memories across service-worker restarts").
+- [x] Wire content scripts to capture the latest message and inject prompt-wrapped context.
+  - Implemented in `apps/extension/src/mount.ts`.
+  - Covered by `apps/extension/src/mount.test.ts`.
 - [x] Add WXT entrypoint scaffold for background and three content scripts.
   - Implemented in `apps/extension/entrypoints/*`.
   - Covered by TypeScript build/typecheck.
@@ -88,9 +96,8 @@
 
 ## Legacy Share Server
 
-- [ ] Remove legacy share-server package or move it behind an archived feature flag.
-  - Implemented in `apps/share-server/src/index.ts`.
-  - No longer part of the current product spec.
+- [x] Remove legacy share-server package.
+  - `apps/share-server` deleted along with its repository, dev server, and tests.
 
 ## Deferred By Spec
 
@@ -103,9 +110,8 @@
 - [x] Full PDF/Word fidelity pipeline beyond the minimal local PDF export.
   - Implemented in `packages/export/src/index.ts` with printable HTML, paged local PDF, and OOXML `.docx`.
   - Covered by `packages/export/src/index.test.ts`.
-- [ ] Remove legacy Postgres/object-storage repository for share-server.
-  - Implemented in `apps/share-server/src/repository.ts`.
-  - No longer part of the current product spec.
+- [x] Remove legacy Postgres/object-storage repository for share-server.
+  - Deleted with `apps/share-server`.
 - [x] Cross-device encrypted sync.
   - Implemented in `packages/sync/src/index.ts`.
   - Covered by `packages/sync/src/index.test.ts`.

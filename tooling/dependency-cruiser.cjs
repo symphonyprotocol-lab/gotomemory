@@ -16,7 +16,7 @@ module.exports = {
         path: "^apps/web/"
       },
       to: {
-        path: "^apps/(extension|share-server)/"
+        path: "^apps/extension/"
       }
     },
     {
@@ -26,17 +26,7 @@ module.exports = {
         path: "^apps/extension/"
       },
       to: {
-        path: "^apps/(web|share-server)/"
-      }
-    },
-    {
-      name: "share-server-must-not-import-other-apps",
-      severity: "error",
-      from: {
-        path: "^apps/share-server/"
-      },
-      to: {
-        path: "^apps/(web|extension)/"
+        path: "^apps/web/"
       }
     },
     {
@@ -44,16 +34,6 @@ module.exports = {
       severity: "error",
       from: {
         path: "^packages/contracts/"
-      },
-      to: {
-        path: "^packages/(?!contracts/)"
-      }
-    },
-    {
-      name: "server-isolation",
-      severity: "error",
-      from: {
-        path: "^apps/share-server/"
       },
       to: {
         path: "^packages/(?!contracts/)"

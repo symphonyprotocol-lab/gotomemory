@@ -16,8 +16,7 @@ is deferred to a clearly-marked "后续高级层 / advanced layer" section in ea
 
 - [System spec](specs/memory-sharing-system.md) — cross-assistant memory for everyday users
   (browser-extension-first), plus one-click conversation export (Markdown/PDF/Obsidian/Notion…).
-- [Share pages spec](specs/share-pages-system.md) — canceled; share links are no longer a
-  product feature.
+  Share links are not a product feature.
 - [Monorepo architecture spec](specs/monorepo-architecture.md) — the engineering skeleton the
   product specs map onto: package layout, dependency boundaries, the shared contract, the
   local-first execution model, and the build/test/release pipeline.
@@ -35,8 +34,6 @@ The consumer-first MVP scaffold is now in place:
 - `packages/site-adapters` and `apps/extension` scaffold the three browser-extension surfaces
   for ChatGPT, Claude, and Gemini.
 - `apps/web` scaffolds the Web homepage.
-- `apps/share-server` is legacy scaffolding from the canceled share-link feature and is not
-  part of the current product path.
 - Advanced/developer layers now include encrypted sync (`packages/sync`), TypeScript SDK
   (`packages/sdk-ts`), CLI (`apps/cli`), MCP JSON-RPC handlers (`apps/mcp-server`), and Python
   SDK (`py/sdk`).

@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  SHARE_PAGE_CSP,
-  renderConversationHtml,
-  renderMarkdown,
-  sanitizeRenderedHtml
-} from "./index.js";
+import { renderConversationHtml, renderMarkdown, sanitizeRenderedHtml } from "./index.js";
 
 describe("readonly renderer", () => {
   it("renders conversation messages as readonly HTML", () => {
@@ -35,10 +30,5 @@ describe("readonly renderer", () => {
 
   it("escapes markdown HTML before formatting", () => {
     expect(renderMarkdown("<script>alert(1)</script>\n\n`code`")).not.toContain("<script>");
-  });
-
-  it("publishes the strict share-page CSP required by the spec", () => {
-    expect(SHARE_PAGE_CSP).toContain("script-src 'none'");
-    expect(SHARE_PAGE_CSP).toContain("img-src 'self' data:");
   });
 });

@@ -1,6 +1,7 @@
 import type { Memory, MemoryPause, Platform } from "@gotomemory/contracts";
 
 export * from "./persistent.js";
+export * from "./extension/index.js";
 export type { MemoryStore } from "./types.js";
 
 import type { MemoryStore } from "./types.js";
