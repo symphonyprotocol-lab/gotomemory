@@ -1,13 +1,6 @@
-import type {
-  ConversationMessage,
-  CreateShareRequest,
-  MemoryCategory,
-  SaveMemoryRequest,
-  ShareVisibility
-} from "../generated/types.js";
+import type { ConversationMessage, MemoryCategory, SaveMemoryRequest } from "../generated/types.js";
 
 const categories = new Set<MemoryCategory>(["preference", "fact", "project", "other"]);
-const visibilities = new Set<ShareVisibility>(["public", "password"]);
 
 export function validateSaveMemoryRequest(input: unknown): SaveMemoryRequest {
   if (!isRecord(input) || typeof input.content !== "string" || input.content.trim() === "") {
@@ -50,37 +43,6 @@ export function validateConversationMessages(input: unknown): ConversationMessag
       content: message.content
     };
   });
-}
-
-export function validateCreateShareRequest(input: unknown): CreateShareRequest {
-  if (!isRecord(input)) {
-    throw new Error("request body is required");
-  }
-
-  const messages = validateConversationMessages(input.messages);
-  const visibility =
-    typeof input.visibility === "string" ? (input.visibility as ShareVisibility) : "public";
-
-  if (!visibilities.has(visibility)) {
-    throw new Error("visibility is invalid");
-  }
-
-  if (visibility === "password" && typeof input.password !== "string") {
-    throw new Error("password is required");
-  }
-
-  return {
-    title: typeof input.title === "string" ? input.title.trim() : undefined,
-    source_platform:
-      typeof input.source_platform === "string"
-        ? (input.source_platform as CreateShareRequest["source_platform"])
-        : undefined,
-    messages,
-    visibility,
-    password: typeof input.password === "string" ? input.password : undefined,
-    expires_in_hours:
-      typeof input.expires_in_hours === "number" ? input.expires_in_hours : undefined
-  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

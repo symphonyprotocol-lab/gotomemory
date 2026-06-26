@@ -1,9 +1,11 @@
 import {
   createGotomemoryClient,
-  type ConversationMessage,
-  type CreateShareRequest,
-  type CreateShareResponse,
-  type GotomemoryClientOptions
+  type ContextRequest,
+  type ContextResponse,
+  type GotomemoryClientOptions,
+  type Memory,
+  type SaveMemoryRequest,
+  type SearchMemoriesRequest
 } from "@gotomemory/contracts";
 
 export class GotomemorySdk {
@@ -13,12 +15,16 @@ export class GotomemorySdk {
     this.#client = createGotomemoryClient(options);
   }
 
-  createShare(input: CreateShareRequest): Promise<CreateShareResponse> {
-    return this.#client.createShare(input);
+  saveMemory(input: SaveMemoryRequest): Promise<Memory> {
+    return this.#client.saveMemory(input);
   }
 
-  shareConversation(messages: ConversationMessage[], title?: string): Promise<CreateShareResponse> {
-    return this.createShare({ title, messages, visibility: "public" });
+  searchMemories(query?: SearchMemoriesRequest): Promise<Memory[]> {
+    return this.#client.searchMemories(query);
+  }
+
+  buildContext(input: ContextRequest): Promise<ContextResponse> {
+    return this.#client.buildContext(input);
   }
 }
 

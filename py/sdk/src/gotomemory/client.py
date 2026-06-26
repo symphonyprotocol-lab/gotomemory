@@ -21,10 +21,10 @@ class GotomemoryClient:
     base_url: str
     token: str | None = None
 
-    def create_share(self, title: str, messages: list[dict[str, str]]) -> dict[str, object]:
+    def save_memory(self, content: str, source: str = "manual") -> dict[str, object]:
         request = Request(
-            f"{self.base_url.rstrip('/')}/v1/shares",
-            data=dumps({"title": title, "messages": messages}).encode("utf-8"),
+            f"{self.base_url.rstrip('/')}/v1/memories",
+            data=dumps({"content": content, "source": source}).encode("utf-8"),
             headers=self._headers(),
             method="POST",
         )

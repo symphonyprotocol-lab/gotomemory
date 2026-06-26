@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  validateConversationMessages,
-  validateCreateShareRequest,
-  validateSaveMemoryRequest
-} from "./validation.js";
+import { validateConversationMessages, validateSaveMemoryRequest } from "./validation.js";
 
 describe("contracts validation", () => {
   it("normalizes save memory input", () => {
@@ -28,12 +24,7 @@ describe("contracts validation", () => {
     ]);
   });
 
-  it("requires passwords for password-protected shares", () => {
-    expect(() =>
-      validateCreateShareRequest({
-        messages: [{ role: "user", content: "hi" }],
-        visibility: "password"
-      })
-    ).toThrow("password is required");
+  it("rejects empty conversation message lists", () => {
+    expect(() => validateConversationMessages([])).toThrow("at least one message");
   });
 });

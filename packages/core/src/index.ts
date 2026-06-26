@@ -94,9 +94,44 @@ export function makeMemoryService(deps: MemoryServiceDeps) {
         (memory) => memory.category === (input.category ?? inferCategory(input.content))
       );
       const [candidate] = await deps.retrieval.rank(input.content, memories, 1);
-      return candidate;
+      if (!candidate) {
+        return undefined;
+      }
+
+      // Spec §11: only prompt a refresh when the new memory is *highly* similar to
+      // an existing one in the same category. Without that gate any shared keyword
+      // would surface a false "replace existing?" prompt.
+      return contentSimilarity(input.content, candidate.content) >= REFRESH_SIMILARITY_THRESHOLD
+        ? candidate
+        : undefined;
     }
   };
+}
+
+export const REFRESH_SIMILARITY_THRESHOLD = 0.5;
+
+function contentSimilarity(left: string, right: string): number {
+  const leftTokens = new Set(tokenizeContent(left));
+  const rightTokens = new Set(tokenizeContent(right));
+  if (leftTokens.size === 0 || rightTokens.size === 0) {
+    return 0;
+  }
+
+  let intersection = 0;
+  for (const token of leftTokens) {
+    if (rightTokens.has(token)) {
+      intersection += 1;
+    }
+  }
+  const union = leftTokens.size + rightTokens.size - intersection;
+  return union === 0 ? 0 : intersection / union;
+}
+
+function tokenizeContent(text: string): string[] {
+  return text
+    .toLocaleLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean);
 }
 
 export function formatAuthorizedMemoryPrompt(memories: Pick<Memory, "content">[]): string {
@@ -118,7 +153,7 @@ export function inferCategory(content: string): MemoryCategory {
   if (/project|repo|仓库|项目|目标/.test(text)) {
     return "project";
   }
-  if (/负责|公司|位于|是|生日|works? at/.test(text)) {
+  if (/负责|公司|位于|生日|出生|来自|works? at|lives? in/.test(text)) {
     return "fact";
   }
   return "other";

@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  ChromeStorageDriver,
-  MemoryJsonStorageDriver,
-  PersistentJsonMemoryStore
-} from "./persistent.js";
+import { ChromeStorageDriver } from "./extension/index.js";
+import { MemoryJsonStorageDriver, PersistentJsonMemoryStore } from "./persistent.js";
 
 describe("persistent memory stores", () => {
   it("persists memories through an injected JSON driver", async () => {

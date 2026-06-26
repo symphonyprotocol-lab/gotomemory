@@ -1,5 +1,4 @@
-import type { ContextResponse, Memory, SharedConversation } from "@gotomemory/contracts";
-import { renderConversationHtml } from "@gotomemory/render";
+import type { ContextResponse, Memory } from "@gotomemory/contracts";
 
 export interface MemoryPanelProps {
   context: ContextResponse;
@@ -15,15 +14,6 @@ export function MemoryPanel({ context, selectedPrivateIds = [] }: MemoryPanelPro
         memories={context.needs_confirm.filter((memory) => selectedPrivateIds.includes(memory.id))}
       />
     </section>
-  );
-}
-
-export function SharePreview({ share }: { share: SharedConversation }) {
-  return (
-    <article aria-label={share.title}>
-      <h1>{share.title}</h1>
-      <div dangerouslySetInnerHTML={{ __html: renderConversationHtml(share.messages) }} />
-    </article>
   );
 }
 

@@ -19,6 +19,7 @@
     "@gotomemory/store": "workspace:*"
   },
   "devDependencies": {
+    "jsdom": "^25.0.1",
     "wxt": "^0.19.13"
   }
 }

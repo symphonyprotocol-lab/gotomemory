@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { MemoryPanel, SharePreview } from "./index.js";
+import { MemoryPanel } from "./index.js";
 
 describe("shared UI", () => {
   it("renders ready memories and only selected private memories", () => {
@@ -18,28 +18,6 @@ describe("shared UI", () => {
     expect(html).toContain("Use TypeScript");
     expect(html).toContain("Private fact");
     expect(html).not.toContain("Hidden");
-  });
-
-  it("renders share previews through the readonly renderer", () => {
-    const html = renderToStaticMarkup(
-      <SharePreview
-        share={{
-          id: "sc_1",
-          user_id: "local",
-          slug: "abcdefghijklmnopqrstuv",
-          title: "Shared",
-          messages: [{ role: "assistant", content: "<script>x</script>safe" }],
-          visibility: "public",
-          status: "active",
-          expires_at: null,
-          view_count: 0,
-          created_at: "2026-06-25T00:00:00.000Z"
-        }}
-      />
-    );
-
-    expect(html).toContain("gotomemory-share");
-    expect(html).not.toContain("<script>");
   });
 });
 

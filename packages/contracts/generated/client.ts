@@ -1,12 +1,11 @@
 import type {
-  CreateShareRequest,
-  CreateShareResponse,
-  PublicShareLockedResponse,
-  PublicShareResponse,
-  ShareListResponse,
-  UnlockShareRequest,
-  UnlockShareResponse,
-  UpdateShareRequest
+  ContextRequest,
+  ContextResponse,
+  Memory,
+  PauseMemoryRequest,
+  SaveMemoryRequest,
+  SearchMemoriesRequest,
+  UpdateMemoryRequest
 } from "./types.js";
 
 export interface GotomemoryClientOptions {
@@ -15,6 +14,12 @@ export interface GotomemoryClientOptions {
   token?: string;
 }
 
+/**
+ * Lightweight fetch client for the memory operations defined in
+ * openapi/memory.yaml (spec §8). In MVP these run locally inside the extension;
+ * once cross-device sync is enabled the same contract is reused against the
+ * sync service, so local and cloud "speak the same language".
+ */
 export function createGotomemoryClient(options: GotomemoryClientOptions) {
   const fetchImpl = options.fetch ?? fetch;
   const headers = () => ({
@@ -35,38 +40,57 @@ export function createGotomemoryClient(options: GotomemoryClientOptions) {
       throw new Error(`gotomemory request failed: ${response.status}`);
     }
 
+    if (response.status === 204) {
+      return undefined as T;
+    }
+
     return (await response.json()) as T;
   }
 
   return {
-    createShare(input: CreateShareRequest) {
-      return request<CreateShareResponse>("/v1/shares", {
+    saveMemory(input: SaveMemoryRequest) {
+      return request<Memory>("/v1/memories", {
         method: "POST",
         body: JSON.stringify(input)
       });
     },
-    listShares() {
-      return request<ShareListResponse>("/v1/shares");
+    searchMemories(query: SearchMemoriesRequest = {}) {
+      const params = new URLSearchParams();
+      if (query.q !== undefined) {
+        params.set("q", query.q);
+      }
+      if (query.limit !== undefined) {
+        params.set("limit", String(query.limit));
+      }
+      const suffix = params.toString() ? `?${params.toString()}` : "";
+      return request<Memory[]>(`/v1/memories${suffix}`);
     },
-    updateShare(id: string, input: UpdateShareRequest) {
-      return request(`/v1/shares/${id}`, {
+    buildContext(input: ContextRequest) {
+      return request<ContextResponse>("/v1/context", {
+        method: "POST",
+        body: JSON.stringify(input)
+      });
+    },
+    updateMemory(id: string, input: UpdateMemoryRequest) {
+      return request<Memory>(`/v1/memories/${encodeURIComponent(id)}`, {
         method: "PATCH",
         body: JSON.stringify(input)
       });
     },
-    deleteShare(id: string) {
-      return request(`/v1/shares/${id}`, {
+    deleteMemory(id: string) {
+      return request<void>(`/v1/memories/${encodeURIComponent(id)}`, {
         method: "DELETE"
       });
     },
-    getPublicShare(slug: string, viewToken?: string) {
-      return request<PublicShareResponse | PublicShareLockedResponse>(`/v1/shares/public/${slug}`, {
-        headers: viewToken ? { authorization: `Bearer ${viewToken}` } : undefined
+    pauseMemory(id: string, input: PauseMemoryRequest) {
+      return request<void>(`/v1/memories/${encodeURIComponent(id)}/pause`, {
+        method: "POST",
+        body: JSON.stringify(input)
       });
     },
-    unlockShare(slug: string, input: UnlockShareRequest) {
-      return request<UnlockShareResponse>(`/v1/shares/public/${slug}/unlock`, {
-        method: "POST",
+    resumeMemory(id: string, input: PauseMemoryRequest) {
+      return request<void>(`/v1/memories/${encodeURIComponent(id)}/pause`, {
+        method: "DELETE",
         body: JSON.stringify(input)
       });
     }
