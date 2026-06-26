@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gotomemory.dev/schemas/memory.schema.json",
+  "title": "Memory",
+  "type": "object",
+  "required": [
+    "id",
+    "user_id",
+    "content",
+    "category",
+    "is_private",
+    "source",
+    "rev",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "id": { "type": "string" },
+    "user_id": { "type": "string" },
+    "content": { "type": "string", "minLength": 1 },
+    "category": { "enum": ["preference", "fact", "project", "other"] },
+    "is_private": { "type": "boolean" },
+    "source": { "enum": ["chatgpt", "claude", "gemini", "manual", "import"] },
+    "embedding": { "type": ["array", "null"], "items": { "type": "number" } },
+    "rev": { "type": "integer", "minimum": 0 },
+    "deleted_at": { "type": ["string", "null"], "format": "date-time" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  }
+}
