@@ -1,0 +1,23 @@
+openapi: 3.1.0
+info:
+  title: gotomemory local memory operation shapes
+  version: 0.0.0
+paths:
+  /v1/memories:
+    post:
+      summary: Save a memory locally
+    get:
+      summary: Search local memories
+  /v1/context:
+    post:
+      summary: Build relevant memory context locally
+  /v1/memories/{id}:
+    patch:
+      summary: Update a memory locally
+    delete:
+      summary: Delete a memory locally
+  /v1/memories/{id}/pause:
+    post:
+      summary: Pause one memory on a platform
+    delete:
+      summary: Resume one memory on a platform

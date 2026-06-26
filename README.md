@@ -1,11 +1,11 @@
 # gotomemory
 
 **Your AI memory, everywhere.** Tell one assistant, and ChatGPT, Claude, and Gemini all
-remember — plus one-click conversation export and read-only sharing. Built for ordinary
+remember — plus one-click conversation export. Built for ordinary
 users: simple to use, near-zero learning curve.
 
 **Local-first.** Memory and export run entirely on your machine — offline, no login, nothing
-uploaded by default. Only sharing a conversation (and optional cross-device sync) uses a
+uploaded by default. Optional cross-device sync is the only planned feature that needs a
 server and an account.
 
 ## Specs
@@ -16,24 +16,42 @@ is deferred to a clearly-marked "后续高级层 / advanced layer" section in ea
 
 - [System spec](specs/memory-sharing-system.md) — cross-assistant memory for everyday users
   (browser-extension-first), plus one-click conversation export (Markdown/PDF/Obsidian/Notion…).
-- [Share pages spec](specs/share-pages-system.md) — share a conversation (full or selected
-  messages) as a read-only link, public or password-protected.
+- [Share pages spec](specs/share-pages-system.md) — canceled; share links are no longer a
+  product feature.
 - [Monorepo architecture spec](specs/monorepo-architecture.md) — the engineering skeleton the
-  two product specs map onto: package layout, dependency boundaries, the shared contract, the
+  product specs map onto: package layout, dependency boundaries, the shared contract, the
   local-first execution model, and the build/test/release pipeline.
 
 ## Status
 
-**Clean slate.** The previous enterprise-grade implementation has been cleared so the
-product can be rebuilt from the simplified, consumer-first specs above. What remains is the
-monorepo scaffolding (root `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`,
-`turbo.json`, ESLint config) and the two specs.
+The consumer-first MVP scaffold is now in place:
 
-## Next
+- `packages/contracts` defines the shared memory contract, schemas, OpenAPI placeholders,
+  validation helpers, and a lightweight client.
+- `packages/core`, `store`, and `retrieval` implement local-first memory save/search/context,
+  private confirmation, pause/resume, update/delete, and keyword fallback retrieval.
+- `packages/render` and `export` implement sanitized rendering plus local
+  Markdown/TXT/Obsidian/JSON/minimal-PDF export.
+- `packages/site-adapters` and `apps/extension` scaffold the three browser-extension surfaces
+  for ChatGPT, Claude, and Gemini.
+- `apps/web` scaffolds the Web homepage.
+- `apps/share-server` is legacy scaffolding from the canceled share-link feature and is not
+  part of the current product path.
+- Advanced/developer layers now include encrypted sync (`packages/sync`), TypeScript SDK
+  (`packages/sdk-ts`), CLI (`apps/cli`), MCP JSON-RPC handlers (`apps/mcp-server`), and Python
+  SDK (`py/sdk`).
 
-Rebuild from the specs, with the browser extension as the P0 surface (it is what ordinary
-users actually touch). Memory and export are local-first (IndexedDB, in-browser retrieval);
-a small server is needed only for conversation sharing (and optional sync). See the MVP
-scope in each spec.
+The execution checklist lives in [docs/implementation-checklist.md](docs/implementation-checklist.md).
+
+## Verify
 
 Requires Node 22.x and pnpm 11.x (pinned via `packageManager`).
+
+```bash
+pnpm install
+pnpm run check
+pnpm run test
+pnpm run build
+pnpm run codegen
+cd py && uv run pytest -q
+```
