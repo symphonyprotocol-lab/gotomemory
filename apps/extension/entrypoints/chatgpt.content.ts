@@ -1,3 +1,11 @@
-import { mountContentScript } from "../src/mount.js";
+import { defineContentScript } from "wxt/sandbox";
 
-mountContentScript("chatgpt");
+import { autoMount } from "../src/mount.js";
+
+export default defineContentScript({
+  matches: ["https://chatgpt.com/*"],
+  runAt: "document_idle",
+  main() {
+    autoMount("chatgpt");
+  }
+});

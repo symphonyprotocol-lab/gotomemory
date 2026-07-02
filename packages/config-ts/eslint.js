@@ -8,6 +8,7 @@ export default [
       "**/dist/**",
       "**/.turbo/**",
       "**/.wxt/**",
+      "**/.output/**",
       "**/coverage/**",
       "**/generated/**",
       "**/*.cjs"

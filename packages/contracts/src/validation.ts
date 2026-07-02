@@ -19,7 +19,13 @@ export function validateSaveMemoryRequest(input: unknown): SaveMemoryRequest {
       typeof input.category === "string"
         ? (input.category as SaveMemoryRequest["category"])
         : undefined,
-    is_private: typeof input.is_private === "boolean" ? input.is_private : undefined
+    is_private: typeof input.is_private === "boolean" ? input.is_private : undefined,
+    role: input.role === "user" || input.role === "assistant" ? input.role : undefined,
+    conversation_id: typeof input.conversation_id === "string" ? input.conversation_id : undefined,
+    conversation_title:
+      typeof input.conversation_title === "string" ? input.conversation_title : undefined,
+    source_url: typeof input.source_url === "string" ? input.source_url : undefined,
+    created_at: typeof input.created_at === "string" ? input.created_at : undefined
   };
 }
 

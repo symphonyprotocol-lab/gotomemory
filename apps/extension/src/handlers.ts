@@ -22,6 +22,8 @@ export function createBackgroundHandlers(deps: BackgroundHandlerDeps = {}) {
       switch (message.type) {
         case "memory.save":
           return { ok: true, value: await service.save(message.input) };
+        case "memory.saveMany":
+          return { ok: true, value: await service.saveMany(message.input) };
         case "memory.search":
           return { ok: true, value: await service.search(message.input) };
         case "memory.context":

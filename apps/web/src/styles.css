@@ -4,24 +4,25 @@
 
 @layer base {
   :root {
-    --background: 42 25% 97%;
-    --foreground: 222 18% 13%;
+    /* gotomemory logo palette on a clean white web surface */
+    --background: 0 0% 100%; /* #ffffff */
+    --foreground: 219 40% 14%; /* #162033 deep ink */
     --card: 0 0% 100%;
-    --card-foreground: 222 18% 13%;
-    --primary: 166 80% 22%;
+    --card-foreground: 219 40% 14%;
+    --primary: 175 100% 36%; /* #00b8a9 signal teal */
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 18% 92%;
-    --secondary-foreground: 222 18% 13%;
-    --muted: 40 16% 90%;
-    --muted-foreground: 220 8% 40%;
-    --accent: 13 82% 58%;
+    --secondary: 180 55% 97%; /* #f4fbfb */
+    --secondary-foreground: 219 40% 14%;
+    --muted: 210 32% 96%;
+    --muted-foreground: 213 14% 39%; /* #586574 */
+    --accent: 1 100% 64%; /* #ff4d49 private coral */
     --accent-foreground: 0 0% 100%;
     --destructive: 0 72% 50%;
     --destructive-foreground: 0 0% 100%;
-    --border: 220 12% 84%;
-    --input: 220 12% 84%;
-    --ring: 166 80% 22%;
-    --radius: 0.5rem;
+    --border: 212 29% 91%; /* #e2e8f0 */
+    --input: 212 29% 91%;
+    --ring: 175 100% 36%;
+    --radius: 0.875rem; /* 14px */
   }
 
   * {
@@ -35,13 +36,19 @@
   body {
     @apply m-0 bg-background text-foreground antialiased;
     font-family:
-      Inter,
+      Manrope,
+      "Noto Sans SC",
       ui-sans-serif,
       system-ui,
       -apple-system,
       BlinkMacSystemFont,
       "Segoe UI",
       sans-serif;
+  }
+
+  ::selection {
+    background: hsl(var(--primary));
+    color: #fff;
   }
 
   a {
@@ -51,7 +58,46 @@
 }
 
 @layer components {
-  .message-bubble {
-    @apply rounded-md border bg-card px-4 py-3 text-sm shadow-line;
+  .gm-card {
+    transition:
+      transform 0.25s cubic-bezier(0.2, 0.7, 0.3, 1),
+      border-color 0.2s,
+      box-shadow 0.25s;
+  }
+
+  .gm-card:hover {
+    transform: translateY(-3px);
+    border-color: hsl(var(--primary));
+    box-shadow: 0 14px 34px -14px rgba(0, 184, 169, 0.3);
+  }
+
+  .gm-btn {
+    transition:
+      transform 0.2s,
+      box-shadow 0.25s,
+      background 0.2s;
+  }
+
+  .gm-btn:hover {
+    transform: translateY(-2px);
+  }
+
+  .gm-link {
+    transition: color 0.18s;
+  }
+
+  .gm-link:hover {
+    color: hsl(var(--primary));
+  }
+
+  .gm-chip {
+    transition:
+      border-color 0.2s,
+      color 0.2s;
+  }
+
+  .gm-chip:hover {
+    border-color: hsl(var(--primary));
+    color: hsl(var(--primary));
   }
 }

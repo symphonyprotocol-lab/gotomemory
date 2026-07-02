@@ -6,6 +6,12 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@gotomemory/console", "dev"],
       "port": 5173
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@gotomemory/web", "dev", "--port", "5180"],
+      "port": 5180
     }
   ]
 }

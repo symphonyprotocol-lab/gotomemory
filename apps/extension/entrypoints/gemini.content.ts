@@ -1,3 +1,11 @@
-import { mountContentScript } from "../src/mount.js";
+import { defineContentScript } from "wxt/sandbox";
 
-mountContentScript("gemini");
+import { autoMount } from "../src/mount.js";
+
+export default defineContentScript({
+  matches: ["https://gemini.google.com/*"],
+  runAt: "document_idle",
+  main() {
+    autoMount("gemini");
+  }
+});

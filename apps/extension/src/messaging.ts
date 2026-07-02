@@ -10,6 +10,7 @@ import type {
 
 export type ExtensionMessage =
   | { type: "memory.save"; input: SaveMemoryRequest }
+  | { type: "memory.saveMany"; input: SaveMemoryRequest[] }
   | { type: "memory.search"; input: SearchMemoriesRequest }
   | { type: "memory.context"; input: ContextRequest }
   | { type: "memory.update"; id: string; input: UpdateMemoryRequest }
@@ -27,6 +28,9 @@ export function createRuntimeMessenger(
   return {
     async save(input: SaveMemoryRequest): Promise<Memory> {
       return unwrap(await sendMessage({ type: "memory.save", input })) as Memory;
+    },
+    async saveMany(inputs: SaveMemoryRequest[]): Promise<Memory[]> {
+      return unwrap(await sendMessage({ type: "memory.saveMany", input: inputs })) as Memory[];
     },
     async search(input: SearchMemoriesRequest = {}): Promise<Memory[]> {
       return unwrap(await sendMessage({ type: "memory.search", input })) as Memory[];
