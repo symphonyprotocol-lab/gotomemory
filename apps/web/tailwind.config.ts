@@ -6,6 +6,11 @@ export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ["Manrope", "Noto Sans SC", "ui-sans-serif", "system-ui", "sans-serif"],
+        display: ["Noto Sans SC", "Manrope", "ui-sans-serif", "system-ui", "sans-serif"],
+        mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "monospace"]
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

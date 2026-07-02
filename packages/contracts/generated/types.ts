@@ -10,6 +10,10 @@ export interface Memory {
   category: MemoryCategory;
   is_private: boolean;
   source: MemorySource;
+  role?: ConversationRole | null;
+  conversation_id?: string | null;
+  conversation_title?: string | null;
+  source_url?: string | null;
   embedding?: number[] | null;
   rev: number;
   deleted_at?: string | null;
@@ -28,6 +32,12 @@ export interface SaveMemoryRequest {
   source?: MemorySource;
   category?: MemoryCategory;
   is_private?: boolean;
+  role?: ConversationRole | null;
+  conversation_id?: string | null;
+  conversation_title?: string | null;
+  source_url?: string | null;
+  /** Original generation time (ISO) to record as the memory's created_at. */
+  created_at?: string | null;
 }
 
 export interface SearchMemoriesRequest {
@@ -39,6 +49,8 @@ export interface ContextRequest {
   platform: Platform;
   topic: string;
   limit?: number;
+  /** Exclude memories from this conversation, so a thread isn't re-injected into itself. */
+  exclude_conversation_id?: string | null;
 }
 
 export interface ContextResponse {
@@ -59,6 +71,8 @@ export interface PauseMemoryRequest {
 export interface ConversationMessage {
   role: ConversationRole;
   content: string;
+  /** Original generation time of the message (ISO), when the platform exposes it. */
+  timestamp?: string | null;
 }
 
 export interface SyncMemoryEnvelope {

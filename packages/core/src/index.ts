@@ -26,24 +26,86 @@ export function makeMemoryService(deps: MemoryServiceDeps) {
   const id =
     deps.id ?? (() => `mem_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`);
 
+  const dedupKey = (conversationId: string, content: string): string =>
+    `${conversationId} ${content}`;
+
+  const buildMemory = (
+    input: SaveMemoryRequest,
+    content: string,
+    conversationId: string | null
+  ): Memory => {
+    const timestamp = now();
+    return {
+      id: id(),
+      user_id: userId,
+      content,
+      category: input.category ?? inferCategory(input.content),
+      is_private: input.is_private ?? false,
+      source: input.source ?? "manual",
+      role: input.role ?? null,
+      conversation_id: conversationId,
+      conversation_title: input.conversation_title ?? null,
+      source_url: input.source_url ?? null,
+      embedding: null,
+      rev: 0,
+      deleted_at: null,
+      // Prefer the message's original generation time; fall back to save time.
+      created_at: input.created_at ?? timestamp,
+      updated_at: timestamp
+    };
+  };
+
   return {
     async save(input: SaveMemoryRequest): Promise<Memory> {
-      const timestamp = now();
-      const memory: Memory = {
-        id: id(),
-        user_id: userId,
-        content: input.content.trim(),
-        category: input.category ?? inferCategory(input.content),
-        is_private: input.is_private ?? false,
-        source: input.source ?? "manual",
-        embedding: null,
-        rev: 0,
-        deleted_at: null,
-        created_at: timestamp,
-        updated_at: timestamp
-      };
+      const content = input.content.trim();
+      const conversationId = input.conversation_id ?? null;
 
-      return deps.store.create(memory);
+      // Conversation-scoped dedup: saving the same line from the same
+      // conversation again returns the existing memory instead of a duplicate,
+      // so re-importing a whole thread is idempotent.
+      if (conversationId) {
+        const existing = (await deps.store.list(userId)).find(
+          (memory) => memory.conversation_id === conversationId && memory.content === content
+        );
+        if (existing) {
+          return existing;
+        }
+      }
+
+      return deps.store.create(buildMemory(input, content, conversationId));
+    },
+
+    // Bulk import a whole conversation in one call. Lists existing memories once
+    // and dedups against them (and within the batch) through an in-memory index,
+    // so importing an N-message thread costs O(N) instead of the O(N²) list
+    // scans of calling save() N times.
+    async saveMany(inputs: SaveMemoryRequest[]): Promise<Memory[]> {
+      const index = new Map<string, Memory>();
+      for (const memory of await deps.store.list(userId)) {
+        if (memory.conversation_id) {
+          index.set(dedupKey(memory.conversation_id, memory.content), memory);
+        }
+      }
+
+      const results: Memory[] = [];
+      for (const input of inputs) {
+        const content = input.content.trim();
+        const conversationId = input.conversation_id ?? null;
+        const key = conversationId ? dedupKey(conversationId, content) : null;
+        if (key) {
+          const existing = index.get(key);
+          if (existing) {
+            results.push(existing);
+            continue;
+          }
+        }
+        const created = await deps.store.create(buildMemory(input, content, conversationId));
+        if (key) {
+          index.set(key, created);
+        }
+        results.push(created);
+      }
+      return results;
     },
 
     async search(input: SearchMemoriesRequest = {}): Promise<Memory[]> {
@@ -57,7 +119,12 @@ export function makeMemoryService(deps: MemoryServiceDeps) {
       const pausedIds = new Set(
         pauses.filter((pause) => pause.platform === input.platform).map((pause) => pause.memory_id)
       );
-      const candidates = memories.filter((memory) => !pausedIds.has(memory.id));
+      const candidates = memories.filter(
+        (memory) =>
+          !pausedIds.has(memory.id) &&
+          (!input.exclude_conversation_id ||
+            memory.conversation_id !== input.exclude_conversation_id)
+      );
       const ranked = await deps.retrieval.rank(input.topic, candidates, input.limit ?? 6);
 
       return {

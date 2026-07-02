@@ -5,6 +5,7 @@ import {
   type ChromeStorageArea,
   type MemoryStore
 } from "@gotomemory/store";
+import { defineBackground } from "wxt/sandbox";
 
 import { createBackgroundHandlers } from "../src/handlers.js";
 import type { ExtensionMessage } from "../src/messaging.js";
@@ -39,9 +40,11 @@ function createStore(): MemoryStore {
     : new InMemoryMemoryStore();
 }
 
-const handleMessage = createBackgroundHandlers({ store: createStore() });
+export default defineBackground(() => {
+  const handleMessage = createBackgroundHandlers({ store: createStore() });
 
-chrome?.runtime?.onMessage?.addListener((message, _sender, sendResponse) => {
-  void handleMessage(message).then(sendResponse);
-  return true;
+  chrome?.runtime?.onMessage?.addListener((message, _sender, sendResponse) => {
+    void handleMessage(message).then(sendResponse);
+    return true;
+  });
 });

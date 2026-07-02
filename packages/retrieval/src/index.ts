@@ -140,12 +140,49 @@ export function cosineSimilarity(left: number[], right: number[]): number {
   return dot / (Math.sqrt(leftMagnitude) * Math.sqrt(rightMagnitude));
 }
 
+// CJK has no word separators, so splitting on non-letters keeps a whole phrase
+// as a single token and keyword overlap never matches. Emit Latin/number words
+// whole and CJK as character bigrams (the standard cheap CJK indexing trick) so
+// "潮汐表" and "巴生港潮汐表" share the "潮汐"/"汐表" tokens.
+const CJK_CHAR = /[㐀-鿿぀-ヿ가-힯豈-﫿ｦ-ﾟㇰ-ㇿ]/u;
+
 export function tokenize(text: string): string[] {
-  return text
-    .toLocaleLowerCase()
-    .split(/[^\p{L}\p{N}]+/u)
-    .map((term) => term.trim())
-    .filter(Boolean);
+  const lower = text.toLocaleLowerCase();
+  const out: string[] = [];
+  let word = "";
+  let cjk = "";
+  const flushWord = (): void => {
+    if (word) {
+      out.push(word);
+      word = "";
+    }
+  };
+  const flushCjk = (): void => {
+    if (cjk.length === 1) {
+      out.push(cjk);
+    } else {
+      for (let i = 0; i < cjk.length - 1; i += 1) {
+        out.push(cjk.slice(i, i + 2));
+      }
+    }
+    cjk = "";
+  };
+
+  for (const char of lower) {
+    if (CJK_CHAR.test(char)) {
+      flushWord();
+      cjk += char;
+    } else if (/[\p{L}\p{N}]/u.test(char)) {
+      flushCjk();
+      word += char;
+    } else {
+      flushWord();
+      flushCjk();
+    }
+  }
+  flushWord();
+  flushCjk();
+  return out;
 }
 
 function normalizeVector(vector: number[]): number[] {

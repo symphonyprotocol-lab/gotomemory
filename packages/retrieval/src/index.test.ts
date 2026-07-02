@@ -14,6 +14,21 @@ describe("keyword retrieval", () => {
     expect(tokenize("React + TypeScript, please")).toEqual(["react", "typescript", "please"]);
   });
 
+  it("tokenizes CJK into character bigrams for keyword overlap", () => {
+    expect(tokenize("潮汐表")).toEqual(["潮汐", "汐表"]);
+    expect(tokenize("typescript严格模式")).toEqual(["typescript", "严格", "格模", "模式"]);
+  });
+
+  it("ranks relevant Chinese memories by topic, not just recency", () => {
+    const results = rankMemories("潮汐", [
+      memory("mem_weather", "吉隆坡今天多云，降雨概率高", "2026-06-24T02:00:00.000Z"),
+      memory("mem_tide", "巴生港潮汐表：高潮 13:54", "2026-06-24T01:00:00.000Z")
+    ]);
+
+    // The tide memory is older but matches the topic, so it must rank first.
+    expect(results.map((result) => result.id)).toEqual(["mem_tide"]);
+  });
+
   it("ranks exact content matches above stale fallback matches", () => {
     const results = rankMemories("typescript react", [
       memory("mem_old", "Use Python for scripts", "2026-06-20T00:00:00.000Z"),
