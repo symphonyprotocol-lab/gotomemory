@@ -29,6 +29,13 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:${CONFIG_PORT:-9281}:80"
+    environment:
+      # Forces a recreate when the mounted nginx config changes. Compose compares
+      # service *definitions* and cannot see the contents of a bind-mounted file,
+      # while nginx only reads its config at startup — so without this an updated
+      # config-endpoint.nginx.conf lands on the host and is silently never served.
+      # The deploy job writes the file's checksum here.
+      CONFIG_CONF_HASH: ${CONFIG_CONF_HASH:-unset}
     volumes:
       - ./config-endpoint.nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./selector-config:/srv/config:ro
