@@ -16,8 +16,8 @@ already running on the host.
 ## One-time server setup
 
 ```bash
-sudo mkdir -p /srv/gotomemory/selector-config
-sudo chown -R "$USER" /srv/gotomemory
+sudo mkdir -p /opt/gotomemory/selector-config
+sudo chown -R "$USER" /opt/gotomemory
 ```
 
 Point the reverse proxy at the two loopback ports — `gotomemory.dev` →
@@ -35,7 +35,7 @@ secrets to it:
 | `DEPLOY_USER`        | SSH user, must be in the `docker` group                          |
 | `DEPLOY_SSH_KEY`     | Private key, whole PEM including the BEGIN/END lines             |
 | `DEPLOY_KNOWN_HOSTS` | Output of `ssh-keyscan -H <host>`                                |
-| `DEPLOY_PATH`        | Directory holding the compose files, e.g. `/srv/gotomemory`      |
+| `DEPLOY_PATH`        | Directory holding the compose files, e.g. `/opt/gotomemory`      |
 | `DEPLOY_PORT`        | Optional, defaults to `22`                                       |
 | `DEPLOY_WEB_PORT`    | Optional, defaults to `8080`; only used by the post-deploy check |
 | `GHCR_PULL_TOKEN`    | Optional — see below                                             |
@@ -69,7 +69,7 @@ selector hot-fix does not need a site release:
 
 ```bash
 pnpm --filter @gotomemory/selector-signing run sign -- --version <n> ...
-scp selector-overrides.v1.json <user>@<host>:/srv/gotomemory/selector-config/
+scp selector-overrides.v1.json <user>@<host>:/opt/gotomemory/selector-config/
 ```
 
 See `tooling/selector-signing/README.md` for the signing runbook. Until
@@ -83,7 +83,7 @@ The running version is pinned in `.env`, and the previous value is kept beside
 it:
 
 ```bash
-cd /srv/gotomemory
+cd /opt/gotomemory
 cat .env.previous          # WEB_IMAGE=ghcr.io/...-web:<older-sha>
 cp .env.previous .env
 docker compose up -d
