@@ -152,32 +152,49 @@ jobs:
             # rollback does not need a GitHub round-trip.
             [ -f .env ] && cp .env .env.previous
             printf 'WEB_IMAGE=%s\n' "$IMAGE" > .env
+            # The config container mounts config-endpoint.nginx.conf, and compose
+            # cannot see that a mounted file's contents changed — it would leave
+            # the old nginx process running with the config it started with.
+            # Feeding the checksum in as an environment variable makes the change
+            # visible to compose, so the container is recreated exactly when the
+            # file actually differs.
+            printf 'CONFIG_CONF_HASH=%s\n' \
+              "$(sha256sum config-endpoint.nginx.conf | cut -d' ' -f1)" >> .env
 
             docker compose pull
             docker compose up -d --remove-orphans
             docker image prune -f
           REMOTE
 
-      - name: Verify the site answers
+      - name: Verify both services answer
         env:
           HOST: ${{ secrets.DEPLOY_HOST }}
           USER: ${{ secrets.DEPLOY_USER }}
           PORT: ${{ secrets.DEPLOY_PORT || '22' }}
           WEB_PORT: ${{ secrets.DEPLOY_WEB_PORT || '9280' }}
+          CONFIG_PORT: ${{ secrets.DEPLOY_CONFIG_PORT || '9281' }}
         # A deploy that starts a broken container should fail loudly here rather
-        # than look green. Checks /privacy/ too, since the store listing links it.
+        # than look green. /privacy/ is checked because the store listing links
+        # it, and the config endpoint because it was previously unchecked — which
+        # is how a deploy that never applied a new config-endpoint.nginx.conf
+        # reported success while serving the old one.
         run: |
           ssh -i ~/.ssh/deploy_key -p "$PORT" "$USER@$HOST" \
-            WEB_PORT="$WEB_PORT" 'bash -euo pipefail -s' <<'REMOTE'
-            for path in / /privacy/; do
+            WEB_PORT="$WEB_PORT" CONFIG_PORT="$CONFIG_PORT" \
+            'bash -euo pipefail -s' <<'REMOTE'
+            check() {
+              local url="$1"
+              local code=""
               for attempt in 1 2 3 4 5; do
-                code="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${WEB_PORT}${path}" || true)"
-                [ "$code" = "200" ] && break
+                code="$(curl -s -o /dev/null -w '%{http_code}' "$url" || true)"
+                [ "$code" = "200" ] && return 0
                 sleep 3
               done
-              if [ "$code" != "200" ]; then
-                echo "::error::${path} returned ${code} after the restart"
-                exit 1
-              fi
-            done
+              echo "::error::${url} returned ${code} after the restart"
+              return 1
+            }
+
+            check "http://127.0.0.1:${WEB_PORT}/"
+            check "http://127.0.0.1:${WEB_PORT}/privacy/"
+            check "http://127.0.0.1:${CONFIG_PORT}/"
           REMOTE
