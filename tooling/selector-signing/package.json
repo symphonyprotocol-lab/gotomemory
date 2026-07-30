@@ -1,0 +1,28 @@
+{
+  "name": "@gotomemory/selector-signing",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/signing.d.ts",
+      "default": "./dist/signing.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "keygen": "tsx src/keygen.ts",
+    "sign": "tsx src/sign.ts"
+  },
+  "dependencies": {
+    "@gotomemory/site-adapters": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "tsx": "^4.19.0"
+  }
+}

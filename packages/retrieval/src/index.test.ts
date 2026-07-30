@@ -1,13 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  HashEmbeddingModel,
-  SemanticRetrievalEngine,
-  cosineSimilarity,
-  rankMemories,
-  tokenize,
-  type EmbeddingModel
-} from "./index.js";
+import { KeywordRetrievalEngine, rankMemories, tokenize } from "./index.js";
 
 describe("keyword retrieval", () => {
   it("tokenizes words across punctuation", () => {
@@ -46,35 +39,39 @@ describe("keyword retrieval", () => {
 
     expect(results.map((result) => result.id)).toEqual(["mem_new", "mem_old"]);
   });
+});
 
-  it("computes cosine similarity for semantic ranking", () => {
-    expect(cosineSimilarity([1, 0], [1, 0])).toBe(1);
-    expect(cosineSimilarity([1, 0], [0, 1])).toBe(0);
+describe("KeywordRetrievalEngine", () => {
+  it("ranks the same as the stateless rankMemories function", async () => {
+    const engine = new KeywordRetrievalEngine();
+    const memories = [
+      memory("mem_weather", "吉隆坡今天多云，降雨概率高", "2026-06-24T02:00:00.000Z"),
+      memory("mem_tide", "巴生港潮汐表：高潮 13:54", "2026-06-24T01:00:00.000Z")
+    ];
+
+    const ranked = await engine.rank("潮汐", memories);
+    expect(ranked.map((m) => m.id)).toEqual(["mem_tide"]);
   });
 
-  it("uses deterministic browser-safe hash embeddings when no model has been downloaded", async () => {
-    const model = new HashEmbeddingModel(8);
+  it("re-tokenizes a memory after it changes instead of serving a stale cache entry", async () => {
+    const engine = new KeywordRetrievalEngine();
+    const original = memory("mem_1", "Use pnpm for installs", "2026-06-24T00:00:00.000Z");
 
-    await expect(model.embed("TypeScript React")).resolves.toHaveLength(8);
-    await expect(model.embed("TypeScript React")).resolves.toEqual(
-      await model.embed("TypeScript React")
+    expect((await engine.rank("typescript", [original])).map((m) => m.id)).toEqual([]);
+
+    // Same id, new content and a bumped updated_at: the cached tokens for
+    // mem_1 must not be reused, or this would still miss.
+    const edited = memory("mem_1", "Prefer TypeScript everywhere", "2026-06-24T00:00:01.000Z");
+    expect((await engine.rank("typescript", [edited])).map((m) => m.id)).toEqual(["mem_1"]);
+  });
+
+  it("respects the limit parameter", async () => {
+    const engine = new KeywordRetrievalEngine();
+    const memories = Array.from({ length: 5 }, (_, i) =>
+      memory(`mem_${i}`, "TypeScript", `2026-06-2${i}T00:00:00.000Z`)
     );
-  });
 
-  it("semantically ranks memories and falls back to keyword ranking when the model fails", async () => {
-    const failingModel: EmbeddingModel = {
-      async embed() {
-        throw new Error("model unavailable");
-      }
-    };
-    const engine = new SemanticRetrievalEngine(failingModel);
-
-    const results = await engine.rank("typescript", [
-      memory("mem_1", "Prefer TypeScript", "2026-06-21T00:00:00.000Z"),
-      memory("mem_2", "Prefer Python", "2026-06-22T00:00:00.000Z")
-    ]);
-
-    expect(results.map((result) => result.id)).toEqual(["mem_1"]);
+    expect(await engine.rank("typescript", memories, 2)).toHaveLength(2);
   });
 });
 

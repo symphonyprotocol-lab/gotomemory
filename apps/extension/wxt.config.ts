@@ -2,7 +2,14 @@ import { fileURLToPath } from "node:url";
 
 import { defineConfig } from "wxt";
 
-import { hostPermissions } from "./src/manifest.js";
+import {
+  defaultLocale,
+  extensionVersion,
+  hostPermissions,
+  manifestDescription,
+  manifestName,
+  permissions
+} from "./src/manifest.js";
 
 // Bundle the workspace packages from their TypeScript source, not their built
 // `dist/`. Otherwise `wxt build` ships stale dependency code unless every
@@ -11,7 +18,7 @@ const workspaceSrc = (pkg: string): string =>
   fileURLToPath(new URL(`../../packages/${pkg}/src/index.ts`, import.meta.url));
 
 const workspaceAliases = Object.fromEntries(
-  ["contracts", "core", "export", "render", "retrieval", "site-adapters", "store"].map((pkg) => [
+  ["contracts", "core", "export", "i18n", "retrieval", "site-adapters", "store"].map((pkg) => [
     `@gotomemory/${pkg}`,
     workspaceSrc(pkg)
   ])
@@ -21,11 +28,17 @@ const workspaceAliases = Object.fromEntries(
 // inline manifest field, which WXT ignores).
 export default defineConfig({
   manifestVersion: 3,
+  // Without this the store upload is named after the package —
+  // "gotomemoryextension-<version>-chrome.zip".
+  zip: {
+    name: "gotomemory"
+  },
   manifest: {
-    name: "gotomemory",
-    description: "Local-first memory sharing across AI assistants.",
-    version: "0.0.0",
-    permissions: ["storage"],
+    name: manifestName,
+    description: manifestDescription,
+    default_locale: defaultLocale,
+    version: extensionVersion,
+    permissions,
     host_permissions: hostPermissions,
     icons: {
       "16": "icon-16.png",

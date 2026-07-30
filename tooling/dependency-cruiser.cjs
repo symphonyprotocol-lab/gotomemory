@@ -40,10 +40,21 @@ module.exports = {
       }
     },
     {
+      name: "i18n-is-leaf",
+      comment: "UI text must be importable from every layer, so it may not depend on any of them.",
+      severity: "error",
+      from: {
+        path: "^packages/i18n/"
+      },
+      to: {
+        path: "^(apps/|packages/(?!i18n/))"
+      }
+    },
+    {
       name: "domain-is-platform-agnostic",
       severity: "error",
       from: {
-        path: "^packages/(core|store|retrieval|export|render)/"
+        path: "^packages/(core|store|retrieval|export)/"
       },
       to: {
         path: "^(apps/|node:|react$|react-dom|wxt$)"

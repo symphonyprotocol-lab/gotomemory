@@ -40,13 +40,14 @@ gotomemory/
 ├─ packages/
 │  ├─ config-ts/         @gotomemory/config-ts      tsconfig/eslint/prettier 预设（已存在引用）
 │  ├─ contracts/         @gotomemory/contracts      OpenAPI + JSON Schema + 生成的类型/客户端（codegen 目标）
+│  ├─ i18n/              @gotomemory/i18n           中英文案字典 + 浏览器语言判定（leaf，各层皆可依赖）
 │  ├─ core/              @gotomemory/core           记忆领域逻辑（纯 TS：CRUD/暂停/刷新/带入选择/prompt 包装）
-│  ├─ store/             @gotomemory/store          存储抽象 + 扩展上下文实现（chrome.storage/IndexedDB）
-│  ├─ retrieval/         @gotomemory/retrieval      浏览器内 embedding + cosine + 关键词回退
+│  ├─ store/             @gotomemory/store          存储抽象 + 扩展上下文实现（chrome.storage.local，事务串行化）
+│  ├─ retrieval/         @gotomemory/retrieval      关键词检索（CJK 二元切分），本机计算
 │  ├─ export/            @gotomemory/export         对话 → MD/TXT/JSON/Obsidian/PDF/docx/Notion blocks
-│  ├─ site-adapters/     @gotomemory/site-adapters  三家站点 DOM 适配器（读消息/写输入框/挂载点）
-│  ├─ render/            @gotomemory/render         Markdown 渲染 + sanitizer（导出预览共用）
-│  └─ ui/                @gotomemory/ui             共享 UI 组件（带入面板/导出弹窗/记忆列表）
+│  └─ site-adapters/     @gotomemory/site-adapters  三家站点 DOM 适配器（读消息/写输入框/挂载点）
+│     （2026-07 精简：原 render 包并入 export，其 preview 渲染器随后也随 printable-HTML
+│      路径取代而删除；原 ui 包无消费者，已删除——面板/记忆库 UI 直接实现在 apps/extension 内）
 │
 ├─ py/
 │  └─ sdk/               gotomemory（PyPI）          高级层：Python SDK（uv，MVP 不主推）
@@ -58,7 +59,7 @@ gotomemory/
 ├─ pnpm-workspace.yaml · turbo.json · tsconfig.base.json · eslint.config.js · .changeset/
 ```
 
-> 现状：`apps/`、`packages/`、`tooling/`、`py/` 目录尚未创建，但 root 配置已假定它们存在。按本规格逐个落地即可，无需改动 root 脚手架。
+> 现状：骨架已全部落地，另含高级层的 `packages/sync`、`packages/sdk-ts`、`apps/cli`、`apps/mcp-server`（未列入上图）。这四个包与 `py/sdk` 处于**冻结**状态，见 §13。
 
 ## 4. 包与应用清单
 
@@ -68,15 +69,14 @@ gotomemory/
 | --- | --- | --- | --- | --- | --- |
 | `config-ts` | 配置 | 共享 tsconfig/eslint/prettier 预设 | 构建期 | 无 | private |
 | `contracts` | 契约（leaf） | API 形状的单一来源：OpenAPI、JSON Schema、生成的 TS 类型 + 轻客户端 | 同构 | 无（不依赖任何业务包） | **public** |
-| `core` | 领域 | 记忆 5 操作、暂停、刷新规则、带入选择与排序、prompt 包装 | 同构（纯 TS） | `contracts` | private |
+| `i18n` | 文案（leaf） | 中/英 UI 文案字典、`navigator.language` 判定、`{name}` 插值与英文单复数 | 同构 | 无（不依赖任何业务包） | private |
+| `core` | 领域 | 记忆 5 操作、暂停、刷新规则、带入选择与排序、prompt 包装 | 同构（纯 TS） | `contracts`、`i18n` | private |
 | `store` | 领域 | 存储接口 + 扩展上下文实现；本地 = source of truth | 浏览器扩展 / Node(测试用内存实现) | `contracts` | private |
 | `retrieval` | 领域 | 相似度计算：可选浏览器内 embedding，缺失则关键词回退 | 浏览器 / Node | `contracts` | private |
-| `export` | 领域 | 对话导出为各格式；本机完成 | 浏览器 / Node | `contracts`、`render`(渲染预览) | private |
-| `render` | 领域 | Markdown 渲染 + sanitizer（安全单点，见 §10） | 同构 | 无 | private |
+| `export` | 领域 | 对话导出为各格式（含 sanitize 预览渲染，安全单点见 §10）；本机完成 | 浏览器 / Node | `contracts` | private |
 | `site-adapters` | 适配 | 三家站点的 DOM 读写与 UI 挂载点 | **仅浏览器/content script** | `contracts` | private |
-| `ui` | 适配 | 跨外壳共享的 React 组件 | 浏览器 | `contracts`、`render` | private |
 | `extension` | 应用 | 组合根：content script + background store + popup/options | 浏览器扩展(MV3) | 任意 `packages/*` | private |
-| `web` | 应用 | Web：`/` 首页 | 浏览器(Vite/React) | 无业务包 | private |
+| `web` | 应用 | Web：`/` 首页 | 浏览器(Vite/React) | `i18n` | private |
 | `py/sdk` | 高级层 | Python SDK（开发者/Agent 接入） | Python(uv) | —（独立工具链） | PyPI(后续) |
 
 关键约束：**`core/store/retrieval/export` 是客户端本地能力**，记忆与检索都在用户本机跑，不存在服务端业务逻辑——这从代码层面坐实"记忆/检索不在我们服务器上跑"。同步服务若上线，应作为单独服务设计，只复用 `contracts` 契约。
@@ -89,10 +89,10 @@ gotomemory/
 应用层    extension / web
    │  （只能向下依赖 packages，app 之间互不依赖）
    ▼
-适配层    site-adapters / ui            ← 触碰 DOM / React 的隔离带
+适配层    site-adapters                 ← 触碰 DOM 的隔离带
    │
    ▼
-领域层    core / store / retrieval / export / render   ← 纯逻辑，平台无关
+领域层    core / store / retrieval / export   ← 纯逻辑，平台无关
    │
    ▼
 契约层    contracts                     ← 叶子，谁都能依赖，它不依赖任何人
@@ -101,7 +101,7 @@ gotomemory/
 `tooling/dependency-cruiser.cjs` 落地的规则（要点）：
 
 - **no-app-to-app**：`apps/*` 之间禁止相互 import。
-- **domain-is-platform-agnostic**：`core`/`store`/`retrieval`/`export`/`render` 内**禁止** import `chrome`、`webextension-polyfill`、`react`、`node:*`（`store` 的扩展实现除外，见下）、以及任何 `apps/*`。它们必须能在 vitest(Node) 里裸跑。
+- **domain-is-platform-agnostic**：`core`/`store`/`retrieval`/`export` 内**禁止** import `chrome`、`webextension-polyfill`、`react`、`node:*`（`store` 的扩展实现除外，见下）、以及任何 `apps/*`。它们必须能在 vitest(Node) 里裸跑。
 - **dom-only-in-adapters**：直接操作站点 DOM 的代码只允许出现在 `site-adapters`。`core` 不得读写页面。
 - **no-cycles**：禁止任何循环依赖。
 - **contracts-is-leaf**：`contracts` 不得依赖任何 `@gotomemory/*`。
@@ -152,6 +152,7 @@ apps/extension/
 - content script 通过 `chrome.runtime` 消息调用 background；background 用 `@gotomemory/core` 执行逻辑、用 `@gotomemory/store` 落盘、用 `@gotomemory/retrieval` 做带入匹配。
 - 捕获默认「建议保存」：site-adapter 用 **DOM content script 读渲染内容**，绝不 override `fetch`/`XHR`（memory 规格 §6.1 隐私纪律）。
 - host 权限精确到 `chatgpt.com` / `claude.ai` / `gemini.google.com`，写进商店说明。
+- **选择器远程配置（平台改版热修）**：`site-adapters` 的 `messageSelector` / `inputSelector` / `mountSelector` 采用"代码内置默认值 + 可远程更新的覆盖配置"——background 定期拉取一份签名的 JSON（只含选择器字符串），校验后覆盖默认值。平台改版时热修选择器即可恢复，不用等扩展商店审核（通常 1～7 天，期间产品对用户就是坏的）。红线：该通道**只下发 CSS 选择器字符串，绝不下发可执行代码**，并在商店说明中写明，避免触碰远程代码政策。签名之外还需**版本单调性**：配置里带一个签进负载的 `version`，扩展记住已接受的最高版本并拒绝更旧的文档——否则能应答该请求的一方（敌意网络、过期 CDN 边缘）可以重放一份签名合法但陈旧的配置，把选择器回滚到已知损坏的一组。拉取本身按最长 6 小时间隔退避（首次安装立即拉），因为 MV3 service worker 会被反复驱逐重启。
 
 ## 8. Web 端
 
@@ -200,7 +201,7 @@ export function makeMemoryService(deps: {
 
 | 安全要点 | 落在哪 | 规格出处 |
 | --- | --- | --- |
-| 导出/预览渲染前 sanitize（禁 `<script>`/事件属性/危险 URL） | `packages/render`（扩展导出预览共用） | memory §6.2 |
+| 导出/预览渲染前 sanitize（禁 `<script>`/事件属性/危险 URL） | `packages/export`（`src/preview.ts`，导出与预览共用） | memory §6.2 |
 | prompt 注入包装（记忆为"授权背景"非系统指令） | `packages/core` 带入组装 | memory §9、§10 |
 | 仅 DOM 读取、不 override 网络 API | `packages/site-adapters`（边界规则禁止其它包碰 DOM） | memory §6.1 |
 | 精确 host 权限、不静默扩权 | `apps/extension/wxt.config.ts` manifest | memory §6.1 |
@@ -214,8 +215,9 @@ export function makeMemoryService(deps: {
 - **本地校验**：`pnpm run check`（= format:check + lint + typecheck + boundaries）。
 - **codegen 关口**：CI 跑 `turbo run codegen` 后校验无 diff（§6）。
 - **测试分层**：
-  - 领域包（`core/store/retrieval/export/render`）→ vitest 单测，Node 环境、无浏览器依赖（边界规则保证可行）。
+  - 领域包（`core/store/retrieval/export`）→ vitest 单测，Node 环境、无浏览器依赖（边界规则保证可行）。
   - `site-adapters` → 对三家站点保存的 DOM fixture 做快照测试；平台改版只需更新该包 fixture。
+  - **线上冒烟（适配器生命线）**：每日用 Playwright 对真实的 chatgpt.com / claude.ai / gemini.google.com 跑"读消息 → 写输入框 → 面板挂载"全链路，选择器失效第一时间报警并触发远程选择器热修（§7），而不是等用户报障。fixture 快照防回归，线上冒烟防平台改版，两者缺一不可——这是本产品形态下**最值得持续投入的工程项**。
   - `apps/extension` → WXT 构建产物冒烟 + 关键流程 e2e（带入/保存/导出）。
 - **发布（Changesets）**：`access: public` 但仅对**确实要发布的包**生效——MVP 阶段只有 `@gotomemory/contracts`（供外部/SDK 对齐）与 `py/sdk` 可能发布；`apps/*` 与内部 `packages/*` 标 `"private": true`，changeset 自动跳过。Release 走 `pnpm run release`（`turbo run build && changeset publish`）。
 - **CI 顺序建议**：install → `check` → `codegen`(diff 校验) → `test` → `build`。
@@ -229,12 +231,21 @@ memory 规格 §12.1 的必做项，对应到包：
 | 三站点捕获 + 带入 + 暂停 | `extension` + `site-adapters` + `core` + `store` |
 | 本地存储 + 本机检索（离线/免登录/不上传） | `store`(扩展实现) + `retrieval`(关键词起步) |
 | 记忆 5 操作 + 隐私开关 + 私密确认 | `core` + `store` |
-| 记忆管理页 | `extension/options` 或 popup + `ui` |
-| 对话导出 MD/TXT/Obsidian/PDF | `export` + `render` |
+| 记忆管理页 | `extension`（面板内记忆库，`src/library.ts`） |
+| 对话导出 MD/TXT/Obsidian/PDF | `export`（PDF 走 printable HTML + 浏览器打印） |
 
 > 跨设备同步**不在 MVP**：`store` 预留 `rev/deleted_at`，但同步器与端到端加密留到本地记忆与导出之后。
 
 ## 13. 高级层占位（不进 MVP 主线）
+
+> **冻结令（2026-07）**：`packages/sync`、`packages/sdk-ts`、`apps/cli`、`apps/mcp-server`、`py/sdk` 已实现并有测试，但在产品规格 §12.4 的验证结论出来之前**冻结**。执行方式：
+>
+> - 从 `pnpm run check` / CI 必跑矩阵移出，降级为 nightly（保留测试、防止彻底腐烂）；
+> - changeset 不对其发版；
+> - `contracts` 变更不承诺同步适配这五个消费方（解冻时统一对齐）；
+> - 不接受新功能，只收致命修复。
+>
+> 解冻条件（满足其一）：§12.4 验证得出"记忆假设成立"（带入 ≥ 3 次/周），或出现付费的开发者/企业需求。代码不删——它们是验证后再激活的存货。
 
 与两份规格的"后续高级层"一致，骨架里只留落点、不展开：
 

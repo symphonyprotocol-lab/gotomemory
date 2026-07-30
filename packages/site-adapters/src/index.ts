@@ -1,5 +1,10 @@
 import type { ConversationMessage, Platform } from "@gotomemory/contracts";
 
+import { serializeElementToMarkdown } from "./dom-markdown.js";
+
+export * from "./overrides.js";
+export { serializeElementToMarkdown } from "./dom-markdown.js";
+
 export interface SiteAdapter {
   platform: Platform;
   host: string;
@@ -9,17 +14,25 @@ export interface SiteAdapter {
   conversationPattern: RegExp;
   extractMessages(root?: ParentNode): ConversationMessage[];
   insertIntoPrompt(text: string, root?: ParentNode): boolean;
+  /** Remove a previously-inserted block from the composer (trust-mode undo). */
+  removeFromPrompt(text: string, root?: ParentNode): boolean;
   findMount(root?: ParentNode): Element | null;
   /** Stable id of the open conversation, parsed from its URL (null on a new/blank chat). */
   conversationId(url?: string): string | null;
 }
 
+// inputSelector is a PRIORITY LIST: comma-separated alternatives are tried in
+// order and the first one with a visible match wins (see findComposer). The
+// real composer anchor comes first; the generic editable/textarea fallbacks
+// exist so a redesign degrades to "probably right" instead of "broken" — the
+// remote override channel can then ship a precise selector without a review
+// cycle. Alternatives must not themselves contain commas (e.g. :is(a, b)).
 export const adapters: Record<Platform, SiteAdapter> = {
   chatgpt: createAdapter({
     platform: "chatgpt",
     host: "chatgpt.com",
     messageSelector: "[data-message-author-role]",
-    inputSelector: "textarea, [contenteditable='true']",
+    inputSelector: "#prompt-textarea, textarea, [contenteditable='true']",
     mountSelector: "main",
     conversationPattern: /\/c\/([^/?#]+)/
   }),
@@ -32,7 +45,7 @@ export const adapters: Record<Platform, SiteAdapter> = {
     // version resilience — the filter resolves to the clean inner elements.
     messageSelector:
       "[data-testid='user-message'], [data-testid='assistant-message'], .font-claude-response, .font-claude-message, [data-is-streaming]",
-    inputSelector: "[contenteditable='true'], textarea",
+    inputSelector: "[contenteditable='true'].ProseMirror, [contenteditable='true'], textarea",
     mountSelector: "main",
     conversationPattern: /\/chat\/([^/?#]+)/
   }),
@@ -40,7 +53,7 @@ export const adapters: Record<Platform, SiteAdapter> = {
     platform: "gemini",
     host: "gemini.google.com",
     messageSelector: "user-query, model-response, [data-message-role]",
-    inputSelector: "[contenteditable='true'], textarea",
+    inputSelector: "rich-textarea [contenteditable='true'], [contenteditable='true'], textarea",
     mountSelector: "main",
     conversationPattern: /\/app\/([^/?#]+)/
   })
@@ -54,28 +67,45 @@ export function getAdapterForUrl(url: string): SiteAdapter | undefined {
 }
 
 function createAdapter(
-  config: Omit<SiteAdapter, "extractMessages" | "insertIntoPrompt" | "findMount" | "conversationId">
+  config: Omit<
+    SiteAdapter,
+    "extractMessages" | "insertIntoPrompt" | "removeFromPrompt" | "findMount" | "conversationId"
+  >
 ): SiteAdapter {
-  return {
+  // Methods read selectors off the adapter object (not the captured config), so
+  // remotely-delivered selector overrides applied after creation take effect
+  // (spec: monorepo §7 选择器远程配置).
+  const adapter: SiteAdapter = {
     ...config,
     extractMessages(root: ParentNode = document) {
-      const matched = Array.from(root.querySelectorAll(config.messageSelector));
+      let matched: Element[];
+      try {
+        matched = Array.from(root.querySelectorAll(adapter.messageSelector));
+      } catch {
+        // An invalid selector (e.g. a bad remote override) must fail open to no
+        // messages for this pass, not throw and kill the caller's whole capture
+        // tick (auto-capture, whole-conversation collection, inject-relevance).
+        return [];
+      }
       // When selectors match both a wrapper and its inner message, keep only the
       // innermost element so we get clean text without duplicates or UI chrome.
       const innermost = matched.filter(
         (element) => !matched.some((other) => other !== element && element.contains(other))
       );
       return innermost
-        .map((element) => toMessage(config.platform, element))
+        .map((element) => {
+          try {
+            return toMessage(config.platform, element);
+          } catch {
+            // One malformed message element (adversarial or pathological DOM)
+            // must not drop every other message in the pass.
+            return undefined;
+          }
+        })
         .filter((message): message is ConversationMessage => Boolean(message));
     },
     insertIntoPrompt(text: string, root: ParentNode = document) {
-      // Prefer a visible composer: pages can hold stray/hidden inputs that would
-      // otherwise be picked first and make insertion silently no-op.
-      const candidates = Array.from(root.querySelectorAll(config.inputSelector)).filter(
-        (element): element is HTMLElement => element instanceof HTMLElement
-      );
-      const input = candidates.find(isVisible) ?? candidates[0];
+      const input = findComposer(adapter.inputSelector, root);
       if (!input) {
         return false;
       }
@@ -120,8 +150,45 @@ function createAdapter(
 
       return false;
     },
+    removeFromPrompt(text: string, root: ParentNode = document) {
+      const input = findComposer(adapter.inputSelector, root);
+      if (!input || !text) {
+        return false;
+      }
+      const doc = input.ownerDocument ?? document;
+
+      if (input instanceof HTMLTextAreaElement || input instanceof HTMLInputElement) {
+        if (!input.value.includes(text)) {
+          return false;
+        }
+        setNativeValue(input, stripInsertedBlock(input.value, text));
+        input.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "deleteContent" }));
+        return true;
+      }
+
+      if (isContentEditableElement(input)) {
+        // Rich editors render inserted "\n" as element boundaries (<br>, block
+        // splits) that vanish from textContent, so a verbatim string match can
+        // never find the block again (observed live on the execCommand path).
+        // Match whitespace-insensitively over the text nodes and delete the
+        // exact range through the editor's own pipeline.
+        if (!removeBlockFromEditable(doc, input, text)) {
+          return false;
+        }
+        input.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "deleteContent" }));
+        return true;
+      }
+
+      return false;
+    },
     findMount(root: ParentNode = document) {
-      return root.querySelector(config.mountSelector);
+      try {
+        return root.querySelector(adapter.mountSelector);
+      } catch {
+        // Same rationale as extractMessages: an invalid mountSelector (bad
+        // remote override) must fail open, not throw.
+        return null;
+      }
     },
     conversationId(url: string = location.href) {
       try {
@@ -132,6 +199,7 @@ function createAdapter(
       }
     }
   };
+  return adapter;
 }
 
 function toMessage(platform: Platform, element: Element): ConversationMessage | undefined {
@@ -141,7 +209,10 @@ function toMessage(platform: Platform, element: Element): ConversationMessage | 
     explicitRole === "user" || explicitRole === "assistant"
       ? explicitRole
       : inferRoleFromElement(platform, element);
-  const content = element.textContent?.trim();
+  // Markdown-preserving serialization (fences/tables/TeX survive; UI chrome is
+  // dropped). Fall back to raw text if the walker yields nothing so an unknown
+  // DOM shape can never lose a message outright.
+  const content = serializeElementToMarkdown(element) || element.textContent?.trim();
 
   if (!role || !content) {
     return undefined;
@@ -196,6 +267,102 @@ function inferRoleFromElement(
 
 function appendText(existing: string, text: string): string {
   return existing ? `${existing}\n\n${text}` : text;
+}
+
+/** Remove an inserted block plus the blank-line separator insertIntoPrompt added. */
+function stripInsertedBlock(existing: string, text: string): string {
+  return existing.includes(`\n\n${text}`)
+    ? existing.replace(`\n\n${text}`, "")
+    : existing.replace(text, "").replace(/^\n+/, "");
+}
+
+/**
+ * Resolve the composer for an inputSelector, treating the comma-separated
+ * alternatives as a priority list: the first alternative with a visible match
+ * wins, so a page-level generic like `[contenteditable='true']` serves as
+ * fallback without hijacking insertion from the real composer (login pages and
+ * side panels routinely contain stray editables). When nothing is visible
+ * (degraded pages, jsdom), falls back to the highest-priority match at all.
+ */
+export function findComposer(
+  inputSelector: string,
+  root: ParentNode = document
+): HTMLElement | null {
+  let hidden: HTMLElement | null = null;
+  for (const part of inputSelector.split(",")) {
+    const selector = part.trim();
+    if (!selector) {
+      continue;
+    }
+    let candidates: HTMLElement[];
+    try {
+      candidates = Array.from(root.querySelectorAll(selector)).filter(
+        (element): element is HTMLElement => element instanceof HTMLElement
+      );
+    } catch {
+      // One invalid alternative (e.g. from a remote override) must not
+      // invalidate the rest of the priority list.
+      continue;
+    }
+    const visible = candidates.find(isVisible);
+    if (visible) {
+      return visible;
+    }
+    hidden ??= candidates[0] ?? null;
+  }
+  return hidden;
+}
+
+/**
+ * Find `text` inside a contenteditable ignoring all whitespace (rich editors
+ * re-render newlines as element boundaries), then delete that text-node range —
+ * preferring execCommand("delete") so framework editors observe the change.
+ */
+function removeBlockFromEditable(doc: Document, root: HTMLElement, text: string): boolean {
+  const target = text.replace(/\s+/g, "");
+  if (!target) {
+    return false;
+  }
+
+  // Map every non-whitespace character to its (text node, offset) position.
+  const positions: Array<{ node: Text; offset: number }> = [];
+  let flat = "";
+  const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const data = (node as Text).data;
+    for (let offset = 0; offset < data.length; offset += 1) {
+      if (!/\s/.test(data[offset]!)) {
+        flat += data[offset]!;
+        positions.push({ node: node as Text, offset });
+      }
+    }
+  }
+
+  const startIndex = flat.indexOf(target);
+  if (startIndex === -1) {
+    return false;
+  }
+  const start = positions[startIndex]!;
+  const end = positions[startIndex + target.length - 1]!;
+
+  const range = doc.createRange();
+  range.setStart(start.node, start.offset);
+  range.setEnd(end.node, end.offset + 1);
+
+  const selection = doc.defaultView?.getSelection?.();
+  if (selection) {
+    selection.removeAllRanges();
+    selection.addRange(range);
+    try {
+      if (doc.execCommand("delete")) {
+        return true;
+      }
+    } catch {
+      // fall through to the direct range removal
+    }
+  }
+  range.deleteContents();
+  return true;
 }
 
 function isVisible(element: HTMLElement): boolean {

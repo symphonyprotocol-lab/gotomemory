@@ -1,0 +1,183 @@
+# Production deploy for gotomemory.dev.
+#
+# Triggered by `ci` COMPLETING on main rather than by the push itself: merging a
+# PR starts both workflows at once, so a plain `on: push` deploy would race the
+# tests and could ship a commit whose suite went red. This way a merge deploys
+# only after its own CI run succeeded.
+#
+# Trade-off to know about: if ci.yml is renamed, or is skipped for a commit, no
+# deploy fires and nothing complains. Use the manual run below in that case.
+
+name: deploy
+
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Commit or branch to deploy
+        required: false
+        default: main
+
+permissions:
+  contents: read
+
+concurrency:
+  # Never let two deploys interleave on the server; queue instead of cancelling,
+  # so an in-flight `docker compose up` is not killed halfway.
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    # A manual run deploys whatever ref was asked for; an automatic one only
+    # proceeds when the CI run it is reacting to actually passed.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.name.outputs.image }}
+    steps:
+      - name: Resolve the commit being deployed
+        id: sha
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            echo "ref=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "ref=${{ inputs.ref }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.sha.outputs.ref }}
+
+      # Tag by SHA, not `latest`: the server then runs an identifiable build and
+      # a rollback is "point .env at the previous SHA".
+      - name: Compose the image reference
+        id: name
+        run: |
+          sha="$(git rev-parse --short HEAD)"
+          echo "image=ghcr.io/${{ github.repository }}-web:${sha}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push the site image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: true
+          tags: ${{ steps.name.outputs.image }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Attach a GitHub Environment so the deploy secrets live behind it and can
+    # be given required reviewers later without touching this file.
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || inputs.ref }}
+
+      - name: Configure SSH
+        env:
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # Pinned host keys rather than StrictHostKeyChecking=no: the deploy key
+          # is a write credential, and disabling the check hands it to anyone who
+          # can answer on that address.
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Ship the compose files
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+          PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "$PORT" "$USER@$HOST" \
+            "mkdir -p '$DEPLOY_PATH/selector-config'"
+          scp -i ~/.ssh/deploy_key -P "$PORT" \
+            deploy/docker-compose.yml deploy/config-endpoint.nginx.conf \
+            "$USER@$HOST:$DEPLOY_PATH/"
+
+      - name: Pull and restart
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+          PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          IMAGE: ${{ needs.publish.outputs.image }}
+          # Only needed while the GHCR package is private; leave the secret unset
+          # once the package is public and this step skips the login.
+          GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
+          GHCR_PULL_USER: ${{ secrets.GHCR_PULL_USER || github.repository_owner }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "$PORT" "$USER@$HOST" \
+            IMAGE="$IMAGE" \
+            DEPLOY_PATH="$DEPLOY_PATH" \
+            GHCR_PULL_TOKEN="$GHCR_PULL_TOKEN" \
+            GHCR_PULL_USER="$GHCR_PULL_USER" \
+            'bash -euo pipefail -s' <<'REMOTE'
+            cd "$DEPLOY_PATH"
+
+            if [ -n "$GHCR_PULL_TOKEN" ]; then
+              printf '%s' "$GHCR_PULL_TOKEN" | docker login ghcr.io -u "$GHCR_PULL_USER" --password-stdin
+            fi
+
+            # .env is what pins the running version; keep the previous value so a
+            # rollback does not need a GitHub round-trip.
+            [ -f .env ] && cp .env .env.previous
+            printf 'WEB_IMAGE=%s\n' "$IMAGE" > .env
+
+            docker compose pull
+            docker compose up -d --remove-orphans
+            docker image prune -f
+          REMOTE
+
+      - name: Verify the site answers
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+          PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+          WEB_PORT: ${{ secrets.DEPLOY_WEB_PORT || '8080' }}
+        # A deploy that starts a broken container should fail loudly here rather
+        # than look green. Checks /privacy/ too, since the store listing links it.
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "$PORT" "$USER@$HOST" \
+            WEB_PORT="$WEB_PORT" 'bash -euo pipefail -s' <<'REMOTE'
+            for path in / /privacy/; do
+              for attempt in 1 2 3 4 5; do
+                code="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${WEB_PORT}${path}" || true)"
+                [ "$code" = "200" ] && break
+                sleep 3
+              done
+              if [ "$code" != "200" ]; then
+                echo "::error::${path} returned ${code} after the restart"
+                exit 1
+              fi
+            done
+          REMOTE

@@ -1,0 +1,16 @@
+# The web image builds from the repo root (the pnpm workspace is the unit of
+# install), so everything not needed for that build is excluded — copying host
+# node_modules in would both bloat the context and shadow the container's own
+# platform-specific installs.
+**/node_modules
+**/dist
+**/dist-types
+**/.turbo
+**/.output
+**/.wxt
+**/coverage
+**/playwright-report
+**/test-results
+.git
+.github
+py

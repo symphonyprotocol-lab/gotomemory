@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "GotoMemory",
+    "description": "Extension name shown in the browser and the web store."
+  },
+  "extDescription": {
+    "message": "Share memory across AI assistants and export chats to your machine.",
+    "description": "Extension summary shown in the browser and the web store."
+  }
+}
