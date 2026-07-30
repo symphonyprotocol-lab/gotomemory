@@ -163,7 +163,7 @@ jobs:
           HOST: ${{ secrets.DEPLOY_HOST }}
           USER: ${{ secrets.DEPLOY_USER }}
           PORT: ${{ secrets.DEPLOY_PORT || '22' }}
-          WEB_PORT: ${{ secrets.DEPLOY_WEB_PORT || '8080' }}
+          WEB_PORT: ${{ secrets.DEPLOY_WEB_PORT || '9280' }}
         # A deploy that starts a broken container should fail loudly here rather
         # than look green. Checks /privacy/ too, since the store listing links it.
         run: |

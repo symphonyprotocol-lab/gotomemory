@@ -15,7 +15,7 @@ services:
     image: ${WEB_IMAGE:?WEB_IMAGE must be set — the deploy job writes it to .env}
     restart: unless-stopped
     ports:
-      - "127.0.0.1:${WEB_PORT:-8080}:80"
+      - "127.0.0.1:${WEB_PORT:-9280}:80"
     logging:
       driver: json-file
       options:
@@ -28,7 +28,7 @@ services:
     image: nginx:1.27-alpine
     restart: unless-stopped
     ports:
-      - "127.0.0.1:${CONFIG_PORT:-8081}:80"
+      - "127.0.0.1:${CONFIG_PORT:-9281}:80"
     volumes:
       - ./config-endpoint.nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./selector-config:/srv/config:ro
