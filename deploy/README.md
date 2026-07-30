@@ -77,6 +77,19 @@ See `tooling/selector-signing/README.md` for the signing runbook. Until
 a real key, every document fails verification and extensions keep their built-in
 selectors — so publishing one has no effect yet.
 
+### What the endpoint returns before then
+
+| Path                          | Response                                            |
+| ----------------------------- | --------------------------------------------------- |
+| `/`                           | `200 {"service":"…","status":"ok"}` — liveness only |
+| `/selector-overrides.v1.json` | `404` until a document is uploaded, then `200`      |
+| anything else                 | `404`                                               |
+
+**A 404 on the document path is not a fault.** No document has been published
+yet, and the extension treats a 404 as "keep the built-in selectors" — it fails
+open by design. The root path exists so that a healthy endpoint does not look
+broken in a browser while that is the case.
+
 ## Rolling back
 
 The running version is pinned in `.env`, and the previous value is kept beside
