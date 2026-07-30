@@ -7,8 +7,8 @@ the stack. Two services run there:
 
 | Service  | Serves                  | Container port   | Content comes from             |
 | -------- | ----------------------- | ---------------- | ------------------------------ |
-| `web`    | `gotomemory.dev`        | `127.0.0.1:8080` | Baked into the GHCR image      |
-| `config` | `config.gotomemory.dev` | `127.0.0.1:8081` | `selector-config/` on the host |
+| `web`    | `gotomemory.dev`        | `127.0.0.1:9280` | Baked into the GHCR image      |
+| `config` | `config.gotomemory.dev` | `127.0.0.1:9281` | `selector-config/` on the host |
 
 Both bind to loopback only. TLS and the public ports stay with the reverse proxy
 already running on the host.
@@ -21,7 +21,7 @@ sudo chown -R "$USER" /opt/gotomemory
 ```
 
 Point the reverse proxy at the two loopback ports — `gotomemory.dev` →
-`127.0.0.1:8080`, `config.gotomemory.dev` → `127.0.0.1:8081` — and make sure both
+`127.0.0.1:9280`, `config.gotomemory.dev` → `127.0.0.1:9281` — and make sure both
 hostnames resolve to the server and have certificates.
 
 ## One-time GitHub setup
@@ -37,7 +37,7 @@ secrets to it:
 | `DEPLOY_KNOWN_HOSTS` | Output of `ssh-keyscan -H <host>`                                |
 | `DEPLOY_PATH`        | Directory holding the compose files, e.g. `/opt/gotomemory`      |
 | `DEPLOY_PORT`        | Optional, defaults to `22`                                       |
-| `DEPLOY_WEB_PORT`    | Optional, defaults to `8080`; only used by the post-deploy check |
+| `DEPLOY_WEB_PORT`    | Optional, defaults to `9280`; only used by the post-deploy check |
 | `GHCR_PULL_TOKEN`    | Optional — see below                                             |
 
 Generate a deploy-only key rather than reusing a personal one:
@@ -98,7 +98,7 @@ workflow → set `ref`.
 ```bash
 docker compose ps
 docker compose logs --tail=50 web
-curl -I http://127.0.0.1:8080/privacy/
+curl -I http://127.0.0.1:9280/privacy/
 ```
 
 The workflow itself curls `/` and `/privacy/` after restarting and fails if
