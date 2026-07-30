@@ -1,0 +1,116 @@
+# Daily live smoke test — "adapter survival" lifeline.
+# Spec: specs/monorepo-architecture.md §11 (线上冒烟（适配器生命线）),
+#       docs/implementation-checklist.md → "Adapter survival".
+#
+# Probes the real chatgpt.com / claude.ai / gemini.google.com with Playwright
+# and fails (exit 1, naming platform + selector) when the selectors published
+# by @gotomemory/site-adapters stop matching.
+#
+# Storage-state secrets are OPTIONAL. Without them, login-gated sites report
+# "login-blocked" and Cloudflare-style interstitials report "bot-blocked" —
+# warnings, not failures (set GOTOMEMORY_SMOKE_STRICT: "1" to make them
+# fatal). To authenticate a platform, add a repo secret containing
+# the JSON produced by `npx playwright codegen --save-storage=state.json <url>`:
+#   GOTOMEMORY_SMOKE_STORAGE_STATE_CHATGPT_JSON
+#   GOTOMEMORY_SMOKE_STORAGE_STATE_CLAUDE_JSON
+#   GOTOMEMORY_SMOKE_STORAGE_STATE_GEMINI_JSON
+#
+# To also exercise messageSelector (the most breakage-prone selector), add a
+# secret per platform pointing at a real, non-empty conversation owned by the
+# smoke account (requires the matching storage state):
+#   GOTOMEMORY_SMOKE_CONVERSATION_URL_CHATGPT / _CLAUDE / _GEMINI
+#
+# Blindness escalation: bot/login-blocked runs are warnings individually, but a
+# streak counter is cached across runs and the job FAILS once a platform has
+# been unverifiable for 3 consecutive nightly runs — a dead lifeline must not
+# stay a silent warning.
+
+name: live-smoke
+
+on:
+  schedule:
+    - cron: "43 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build live-smoke and its workspace dependencies
+        run: pnpm --filter "@gotomemory/live-smoke..." run build
+
+      - name: Install Playwright Chromium
+        run: pnpm --filter @gotomemory/live-smoke exec playwright install chromium --with-deps
+
+      # Optional: turn storage-state secrets into files + env vars. Steps are
+      # no-ops when the secrets are unset (anonymous probing, login-blocked
+      # results for login-gated sites).
+      - name: Materialize optional storage states
+        env:
+          CHATGPT_STATE: ${{ secrets.GOTOMEMORY_SMOKE_STORAGE_STATE_CHATGPT_JSON }}
+          CLAUDE_STATE: ${{ secrets.GOTOMEMORY_SMOKE_STORAGE_STATE_CLAUDE_JSON }}
+          GEMINI_STATE: ${{ secrets.GOTOMEMORY_SMOKE_STORAGE_STATE_GEMINI_JSON }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/smoke-auth"
+          write_state() {
+            local platform="$1" contents="$2"
+            if [ -n "$contents" ]; then
+              printf '%s' "$contents" > "$RUNNER_TEMP/smoke-auth/$platform.json"
+              echo "GOTOMEMORY_SMOKE_STORAGE_STATE_$(echo "$platform" | tr '[:lower:]' '[:upper:]')=$RUNNER_TEMP/smoke-auth/$platform.json" >> "$GITHUB_ENV"
+            fi
+          }
+          write_state chatgpt "$CHATGPT_STATE"
+          write_state claude "$CLAUDE_STATE"
+          write_state gemini "$GEMINI_STATE"
+
+      # The streak file survives across nightly runs via the actions cache
+      # (immutable keys, so save under the run id and restore the latest prefix).
+      - name: Restore blindness streak state
+        uses: actions/cache/restore@v4
+        with:
+          path: tooling/live-smoke/live-smoke-streak.json
+          key: live-smoke-streak-${{ github.run_id }}
+          restore-keys: |
+            live-smoke-streak-
+
+      - name: Run live smoke
+        env:
+          GOTOMEMORY_SMOKE_STRICT: "0"
+          GOTOMEMORY_SMOKE_REPORT: ${{ github.workspace }}/tooling/live-smoke/live-smoke-report.json
+          GOTOMEMORY_SMOKE_STATE: ${{ github.workspace }}/tooling/live-smoke/live-smoke-streak.json
+          GOTOMEMORY_SMOKE_BLIND_THRESHOLD: "3"
+          GOTOMEMORY_SMOKE_CONVERSATION_URL_CHATGPT: ${{ secrets.GOTOMEMORY_SMOKE_CONVERSATION_URL_CHATGPT }}
+          GOTOMEMORY_SMOKE_CONVERSATION_URL_CLAUDE: ${{ secrets.GOTOMEMORY_SMOKE_CONVERSATION_URL_CLAUDE }}
+          GOTOMEMORY_SMOKE_CONVERSATION_URL_GEMINI: ${{ secrets.GOTOMEMORY_SMOKE_CONVERSATION_URL_GEMINI }}
+        run: pnpm --filter @gotomemory/live-smoke run smoke:live
+
+      - name: Save blindness streak state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: tooling/live-smoke/live-smoke-streak.json
+          key: live-smoke-streak-${{ github.run_id }}
+
+      - name: Upload JSON report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-smoke-report
+          path: tooling/live-smoke/live-smoke-report.json
+          if-no-files-found: ignore

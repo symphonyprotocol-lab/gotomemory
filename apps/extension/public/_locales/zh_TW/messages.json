@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "GotoMemory",
+    "description": "Extension name shown in the browser and the web store."
+  },
+  "extDescription": {
+    "message": "在 AI 助手之间共享记忆，并把对话一键导出到本机。",
+    "description": "Extension summary shown in the browser and the web store."
+  }
+}

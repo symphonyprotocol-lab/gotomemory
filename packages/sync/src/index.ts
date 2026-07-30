@@ -39,7 +39,7 @@ export async function encryptMemory(
 ): Promise<SyncMemoryEnvelope> {
   const salt = randomBytes(16);
   const iv = randomBytes(12);
-  const key = await deriveKey(passphrase, salt);
+  const key = await deriveKey(passphrase, salt, PBKDF2_ITERATIONS);
   const encoded = new TextEncoder().encode(JSON.stringify(memory));
   const ciphertext = await crypto.subtle.encrypt(
     { name: "AES-GCM", iv: toArrayBuffer(iv) },
@@ -54,6 +54,7 @@ export async function encryptMemory(
     ciphertext: bytesToBase64(new Uint8Array(ciphertext)),
     iv: bytesToBase64(iv),
     salt: bytesToBase64(salt),
+    kdf_iterations: PBKDF2_ITERATIONS,
     updated_at: memory.updated_at,
     deleted_at: memory.deleted_at
   };
@@ -63,7 +64,13 @@ export async function decryptMemory(
   envelope: SyncMemoryEnvelope,
   passphrase: string
 ): Promise<Memory> {
-  const key = await deriveKey(passphrase, base64ToBytes(envelope.salt));
+  // Honour the envelope's own iteration count so envelopes written before the
+  // cost was raised still decrypt.
+  const key = await deriveKey(
+    passphrase,
+    base64ToBytes(envelope.salt),
+    envelope.kdf_iterations ?? LEGACY_PBKDF2_ITERATIONS
+  );
   const plaintext = await crypto.subtle.decrypt(
     { name: "AES-GCM", iv: toArrayBuffer(base64ToBytes(envelope.iv)) },
     key,
@@ -95,7 +102,21 @@ export class EncryptedSyncClient {
   }
 }
 
-async function deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
+/**
+ * OWASP's current floor for PBKDF2-HMAC-SHA256 (was 100_000 here, set years
+ * before that guidance moved). The envelope stores its own salt, so raising
+ * this only affects newly-derived keys.
+ */
+const PBKDF2_ITERATIONS = 600_000;
+
+/** What envelopes without a recorded `kdf_iterations` were derived with. */
+const LEGACY_PBKDF2_ITERATIONS = 100_000;
+
+async function deriveKey(
+  passphrase: string,
+  salt: Uint8Array,
+  iterations: number
+): Promise<CryptoKey> {
   const material = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(passphrase),
@@ -107,7 +128,7 @@ async function deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKe
     {
       name: "PBKDF2",
       salt: toArrayBuffer(salt),
-      iterations: 100_000,
+      iterations,
       hash: "SHA-256"
     },
     material,
@@ -123,8 +144,17 @@ function randomBytes(length: number): Uint8Array {
   return bytes;
 }
 
+// `String.fromCharCode(...bytes)` spreads every byte as an argument and blows
+// the call stack somewhere around 100KB — reachable with a single long
+// assistant answer. Build the binary string in bounded chunks instead.
+const BASE64_CHUNK = 0x8000;
+
 function bytesToBase64(bytes: Uint8Array): string {
-  return btoa(String.fromCharCode(...bytes));
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += BASE64_CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + BASE64_CHUNK));
+  }
+  return btoa(binary);
 }
 
 function base64ToBytes(value: string): Uint8Array {

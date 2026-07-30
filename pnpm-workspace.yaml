@@ -1,6 +1,7 @@
 packages:
   - "apps/*"
   - "packages/*"
+  - "tooling/*"
 
 # Approve install scripts for trusted deps under pnpm's secure-by-default gating.
 # esbuild (vitest/tsx) ships a prebuilt binary; spawn-sync (wxt toolchain) builds a helper.

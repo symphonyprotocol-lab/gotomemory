@@ -17,6 +17,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@gotomemory/contracts": "workspace:*"
+    "@gotomemory/contracts": "workspace:*",
+    "@gotomemory/core": "workspace:*"
   }
 }

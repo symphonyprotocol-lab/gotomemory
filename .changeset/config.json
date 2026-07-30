@@ -7,5 +7,5 @@
   "access": "public",
   "baseBranch": "main",
   "updateInternalDependencies": "patch",
-  "ignore": []
+  "ignore": ["@gotomemory/sync", "@gotomemory/sdk", "@gotomemory/cli", "@gotomemory/mcp-server"]
 }

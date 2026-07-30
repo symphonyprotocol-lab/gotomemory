@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
-import { adapters, getAdapterForUrl } from "./index.js";
+import { adapters, applySelectorOverrides, getAdapterForUrl } from "./index.js";
 
 describe("site adapters", () => {
   it("resolves adapters by exact product hosts", () => {
@@ -77,5 +77,88 @@ describe("site adapters", () => {
       { role: "user", content: "my question", timestamp: null },
       { role: "assistant", content: "the assistant answer", timestamp: null }
     ]);
+  });
+
+  it("removes a previously inserted block from the composer (trust-mode undo)", () => {
+    document.body.innerHTML = "<textarea>my draft</textarea>";
+    const textarea = document.querySelector("textarea");
+
+    expect(adapters.chatgpt.insertIntoPrompt("injected memories")).toBe(true);
+    expect(textarea?.value).toBe("my draft\n\ninjected memories");
+
+    expect(adapters.chatgpt.removeFromPrompt("injected memories")).toBe(true);
+    expect(textarea?.value).toBe("my draft");
+    // A second undo is a no-op.
+    expect(adapters.chatgpt.removeFromPrompt("injected memories")).toBe(false);
+  });
+
+  it("prefers the platform composer over stray editables (priority list)", () => {
+    // A stray editable earlier in DOM order must not hijack insertion when the
+    // real composer anchor (#prompt-textarea) is present.
+    document.body.innerHTML = `
+      <div contenteditable="true" data-stray></div>
+      <div id="prompt-textarea" contenteditable="true"></div>`;
+
+    expect(adapters.chatgpt.insertIntoPrompt("Memory context")).toBe(true);
+    expect(document.querySelector("#prompt-textarea")?.textContent).toContain("Memory context");
+    expect(document.querySelector("[data-stray]")?.textContent).toBe("");
+  });
+
+  it("survives an invalid alternative in the selector priority list", () => {
+    const original = adapters.chatgpt.inputSelector;
+    try {
+      applySelectorOverrides(adapters, {
+        chatgpt: { inputSelector: ":::not-a-selector, textarea" }
+      });
+      document.body.innerHTML = "<textarea></textarea>";
+      expect(adapters.chatgpt.insertIntoPrompt("still works")).toBe(true);
+      expect(document.querySelector("textarea")?.value).toBe("still works");
+    } finally {
+      applySelectorOverrides(adapters, { chatgpt: { inputSelector: original } });
+    }
+  });
+
+  it("undoes an injected block in a contenteditable whose newlines became <br>", () => {
+    // Real rich-text composers re-render inserted "\n" as element boundaries,
+    // so textContent no longer contains the newlines we inserted (observed
+    // live in the extension E2E). Undo must still find and remove the block.
+    document.body.innerHTML =
+      `<div contenteditable="true">my draft<br>以下是用户授权的相关记忆。<br>` +
+      `记忆：<br>- 以后代码示例优先用 TypeScript</div>`;
+
+    const removed = adapters.chatgpt.removeFromPrompt(
+      "以下是用户授权的相关记忆。\n记忆：\n- 以后代码示例优先用 TypeScript"
+    );
+
+    expect(removed).toBe(true);
+    const editor = document.querySelector("[contenteditable]");
+    expect(editor?.textContent).toContain("my draft");
+    expect(editor?.textContent).not.toContain("TypeScript");
+    // A second undo finds nothing.
+    expect(adapters.chatgpt.removeFromPrompt("以后代码示例优先用 TypeScript")).toBe(false);
+  });
+
+  describe("remote selector overrides", () => {
+    const original = adapters.chatgpt.messageSelector;
+    afterEach(() => {
+      applySelectorOverrides(adapters, { chatgpt: { messageSelector: original } });
+    });
+
+    it("changes live extraction behavior after being applied", () => {
+      document.body.innerHTML = `
+        <main>
+          <div data-message-author-role="user">old markup</div>
+          <div data-new-turn="user">new markup</div>
+        </main>`;
+
+      expect(adapters.chatgpt.extractMessages().map((m) => m.content)).toEqual(["old markup"]);
+
+      applySelectorOverrides(adapters, { chatgpt: { messageSelector: "[data-new-turn]" } });
+      expect(adapters.chatgpt.extractMessages().map((m) => m.content)).toEqual([]);
+      // Role comes from the override-matched element's attributes when present.
+      document.body.innerHTML = `
+        <main><div data-new-turn data-message-author-role="user">new markup</div></main>`;
+      expect(adapters.chatgpt.extractMessages().map((m) => m.content)).toEqual(["new markup"]);
+    });
   });
 });

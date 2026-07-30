@@ -1,0 +1,17 @@
+{
+  "name": "@gotomemory/extension-e2e",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "e2e": "tsx src/prepare.ts && playwright test",
+    "e2e:only": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@types/node": "^22.9.0",
+    "tsx": "^4.19.0"
+  }
+}

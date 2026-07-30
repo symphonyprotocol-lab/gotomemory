@@ -15,10 +15,27 @@ export class InMemoryMemoryStore implements MemoryStore {
     return clone(memory);
   }
 
+  async createMany(memories: Memory[]): Promise<Memory[]> {
+    return Promise.all(memories.map((memory) => this.create(memory)));
+  }
+
   async list(userId: string): Promise<Memory[]> {
     return [...this.#memories.values()]
       .filter((memory) => memory.user_id === userId && !memory.deleted_at)
       .sort((left, right) => right.updated_at.localeCompare(left.updated_at))
+      .map(clone);
+  }
+
+  async listByConversation(userId: string, conversationIds: string[]): Promise<Memory[]> {
+    const wanted = new Set(conversationIds);
+    return [...this.#memories.values()]
+      .filter(
+        (memory) =>
+          memory.user_id === userId &&
+          !memory.deleted_at &&
+          memory.conversation_id != null &&
+          wanted.has(memory.conversation_id)
+      )
       .map(clone);
   }
 
@@ -52,6 +69,12 @@ export class InMemoryMemoryStore implements MemoryStore {
       if (pauseKey.startsWith(`${userId}:${id}:`)) {
         this.#pauses.delete(pauseKey);
       }
+    }
+  }
+
+  async removeMany(userId: string, ids: string[]): Promise<void> {
+    for (const id of ids) {
+      await this.remove(userId, id);
     }
   }
 

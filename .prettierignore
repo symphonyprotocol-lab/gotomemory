@@ -10,3 +10,8 @@ dist/
 coverage/
 **/generated/
 pnpm-lock.yaml
+
+# Playwright run artifacts. Git-ignored, but Prettier still walked them, so
+# `pnpm run check` failed for anyone who had run the e2e suite locally.
+**/test-results/
+**/playwright-report/

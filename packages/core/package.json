@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@gotomemory/contracts": "workspace:*",
+    "@gotomemory/i18n": "workspace:*",
     "@gotomemory/retrieval": "workspace:*",
     "@gotomemory/store": "workspace:*"
   }

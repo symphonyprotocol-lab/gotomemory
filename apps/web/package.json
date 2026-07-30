@@ -11,6 +11,7 @@
     "dev": "vite --host 0.0.0.0 --port 5173"
   },
   "dependencies": {
+    "@gotomemory/i18n": "workspace:*",
     "@vitejs/plugin-react": "^4.3.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

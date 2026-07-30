@@ -82,6 +82,8 @@ export interface SyncMemoryEnvelope {
   ciphertext: string;
   iv: string;
   salt: string;
+  /** PBKDF2 iteration count used to derive this envelope's key. Absent on envelopes written before the count was raised — decrypt falls back to the legacy count in that case. */
+  kdf_iterations?: number;
   updated_at: string;
   deleted_at?: string | null;
 }

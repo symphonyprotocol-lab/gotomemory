@@ -1,7 +1,34 @@
 import type { ConversationMessage } from "@gotomemory/contracts";
-import { renderConversationHtml } from "@gotomemory/render";
 
-export type ExportFormat = "markdown" | "txt" | "obsidian" | "pdf" | "docx" | "html" | "json";
+import { isSafeImageUrl, parseMarkdownBlocks, type ParsedBlock } from "./blocks.js";
+import { conversationToNotionBlocks } from "./notion.js";
+
+export { isHttpUrl, isSafeImageUrl, parseMarkdownBlocks, type ParsedBlock } from "./blocks.js";
+export {
+  conversationToNotionBlocks,
+  chunkNotionBlocks,
+  toNotionCodeLanguage,
+  toNotionRichText,
+  NOTION_RICH_TEXT_LIMIT,
+  NOTION_BLOCKS_PER_APPEND,
+  type NotionBlock,
+  type NotionRichText,
+  type NotionParagraphBlock,
+  type NotionHeading1Block,
+  type NotionHeading2Block,
+  type NotionHeading3Block,
+  type NotionCodeBlock,
+  type NotionEquationBlock,
+  type NotionImageBlock,
+  type NotionTableBlock,
+  type NotionTableRowBlock
+} from "./notion.js";
+
+// PDF is deliberately absent: the local byte-writer it once used truncated
+// long conversations and rendered CJK as mojibake. PDF export now goes through
+// `toPrintableHtml` + the browser's print-to-PDF (see the extension panel),
+// which is loss-free and font-complete.
+export type ExportFormat = "markdown" | "txt" | "obsidian" | "docx" | "html" | "json" | "notion";
 
 export interface ExportInput {
   title: string;
@@ -31,17 +58,17 @@ export function exportConversation(input: ExportInput): ExportedConversation {
       );
     case "html":
       return textExport(`${slugify(input.title)}.html`, "text/html", toPrintableHtml(input));
+    case "notion":
+      return textExport(
+        `${slugify(input.title)}.notion.json`,
+        "application/json",
+        JSON.stringify({ blocks: conversationToNotionBlocks(input) }, null, 2)
+      );
     case "docx":
       return {
         filename: `${slugify(input.title)}.docx`,
         mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         content: toDocx(input)
-      };
-    case "pdf":
-      return {
-        filename: `${slugify(input.title)}.pdf`,
-        mimeType: "application/pdf",
-        content: pagedPdf(toText(input.messages))
       };
   }
 }
@@ -56,10 +83,6 @@ export function toText(messages: ConversationMessage[]): string {
     .join("\n\n");
 }
 
-export function previewHtml(messages: ConversationMessage[]): string {
-  return renderConversationHtml(messages);
-}
-
 export function toPrintableHtml(input: Pick<ExportInput, "title" | "messages">): string {
   return [
     "<!doctype html>",
@@ -71,15 +94,101 @@ export function toPrintableHtml(input: Pick<ExportInput, "title" | "messages">):
     "body{font-family:Inter,system-ui,sans-serif;line-height:1.55;max-width:840px;margin:40px auto;padding:0 24px;color:#161616}",
     ".message{border-top:1px solid #ddd;padding:18px 0}.role{text-transform:uppercase;font-size:12px;color:#666;letter-spacing:.08em}",
     "pre{white-space:pre-wrap;background:#f6f6f6;padding:12px;border-radius:6px}",
+    "code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em}",
+    "table{border-collapse:collapse;margin:12px 0;width:100%}th,td{border:1px solid #ccc;padding:6px 10px;text-align:left;vertical-align:top}th{background:#f2f2f2}",
+    ".math-block{white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:#fafafa;padding:12px;border-radius:6px;margin:12px 0}",
+    "figure{margin:12px 0}img{max-width:100%;height:auto}figcaption{font-size:12px;color:#666}",
     "@media print{body{margin:0;max-width:none}.message{break-inside:avoid}}",
     "</style>",
     "</head>",
     "<body>",
     `<h1>${escapeHtml(input.title)}</h1>`,
-    renderConversationHtml(input.messages),
+    renderPrintableMessages(input.messages),
     "</body>",
     "</html>"
   ].join("");
+}
+
+function renderPrintableMessages(messages: ConversationMessage[]): string {
+  const body = messages
+    .map(
+      (message) =>
+        `<article class="message message-${message.role}"><div class="role">${escapeHtml(message.role)}</div>${renderPrintableMarkdown(message.content)}</article>`
+    )
+    .join("");
+
+  return `<section class="gotomemory-share" data-readonly="true">${body}</section>`;
+}
+
+/**
+ * Fidelity renderer for the printable HTML / print-to-PDF path (spec §6.2):
+ * fenced code stays in <pre><code> with its language, tables become real
+ * <table> markup, math is kept as literal TeX text, and images become <img>
+ * only for http(s)/data URLs. All content is HTML-escaped first; the only
+ * tags in the output are the ones generated here.
+ */
+export function renderPrintableMarkdown(markdown: string): string {
+  return parseMarkdownBlocks(markdown).map(renderPrintableBlock).join("");
+}
+
+function renderPrintableBlock(block: ParsedBlock): string {
+  switch (block.kind) {
+    case "code": {
+      const languageClass = /^[a-z0-9#+.-]+$/.test(block.language)
+        ? ` class="language-${block.language}"`
+        : "";
+      return `<pre><code${languageClass}>${escapeHtml(block.code)}</code></pre>`;
+    }
+    case "equation":
+      return `<div class="math-block">$$\n${escapeHtml(block.expression)}\n$$</div>`;
+    case "table": {
+      const [header = [], ...rows] = block.rows;
+      const head = `<thead><tr>${header.map((cell) => `<th>${renderInline(cell)}</th>`).join("")}</tr></thead>`;
+      const body = rows.length
+        ? `<tbody>${rows.map((row) => `<tr>${row.map((cell) => `<td>${renderInline(cell)}</td>`).join("")}</tr>`).join("")}</tbody>`
+        : "";
+      return `<table>${head}${body}</table>`;
+    }
+    case "image":
+      return isSafeImageUrl(block.url)
+        ? `<figure><img src="${escapeHtml(block.url)}" alt="${escapeHtml(block.alt)}">${
+            block.alt ? `<figcaption>${escapeHtml(block.alt)}</figcaption>` : ""
+          }</figure>`
+        : `<p>[image: ${escapeHtml(block.alt || block.url)}]</p>`;
+    case "heading": {
+      // The document title owns <h1>; shift content headings one level down.
+      const level = Math.min(block.level + 1, 6);
+      return `<h${level}>${renderInline(block.text)}</h${level}>`;
+    }
+    case "paragraph":
+      return `<p>${renderInline(block.text)}</p>`;
+  }
+}
+
+const INLINE_CODE_SENTINEL = "\u0000";
+
+function renderInline(text: string): string {
+  let html = escapeHtml(text);
+
+  // Protect inline code spans so image/bold rewriting cannot touch them.
+  const codeSpans: string[] = [];
+  html = html.replace(/`([^`]+)`/g, (_match, code: string) => {
+    const index = codeSpans.push(`<code>${code}</code>`) - 1;
+    return `${INLINE_CODE_SENTINEL}${index}${INLINE_CODE_SENTINEL}`;
+  });
+
+  // Inline images: URLs are already HTML-escaped, safe for the src attribute.
+  html = html.replace(/!\[([^\]]*)\]\(([^()\s]+)\)/g, (match, alt: string, url: string) =>
+    isSafeImageUrl(url) ? `<img src="${url}" alt="${alt}">` : match
+  );
+  html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+
+  html = html.replace(
+    new RegExp(`${INLINE_CODE_SENTINEL}(\\d+)${INLINE_CODE_SENTINEL}`, "g"),
+    (_match, index: string) => codeSpans[Number(index)] ?? ""
+  );
+
+  return html.replace(/\n/g, "<br>");
 }
 
 export function toDocx(input: Pick<ExportInput, "title" | "messages">): Uint8Array {
@@ -118,34 +227,28 @@ function textExport(filename: string, mimeType: string, content: string): Export
   return { filename, mimeType, content };
 }
 
-function slugify(value: string): string {
-  return (
-    value
-      .toLocaleLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "") || "conversation"
-  );
-}
+/**
+ * Filename stem for an exported conversation.
+ *
+ * Only filesystem-reserved characters are replaced. The previous ASCII-only
+ * slug erased CJK entirely, so every Chinese-titled conversation downloaded as
+ * the same fallback "conversation" filename - the common case for this product.
+ */
+// eslint-disable-next-line no-control-regex -- stripping control characters is the point
+const RESERVED_FILENAME_CHARS = /[\u0000-\u001f<>:"/\\|?*\s]+/g;
+const MAX_FILENAME_STEM = 80;
 
-function pagedPdf(text: string): Uint8Array {
-  const escaped = text
-    .split(/\n+/)
-    .slice(0, 42)
-    .map((line, index) => `${index === 0 ? "" : "0 -16 Td "}${pdfText(line.slice(0, 96))} Tj`)
-    .join("\n");
-  const pdf = `%PDF-1.4
-1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
-2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
-3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >> endobj
-4 0 obj << /Length ${escaped.length + 32} >> stream
-BT /F1 12 Tf 72 720 Td
-${escaped}
-ET
-endstream endobj
-5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj
-trailer << /Root 1 0 R >>
-%%EOF`;
-  return new TextEncoder().encode(pdf);
+function slugify(value: string): string {
+  const cleaned = value
+    .normalize("NFC")
+    .toLocaleLowerCase()
+    .replace(RESERVED_FILENAME_CHARS, "-")
+    .replace(/-{2,}/g, "-")
+    .slice(0, MAX_FILENAME_STEM)
+    // Windows rejects a trailing dot or space on the stem.
+    .replace(/^[-.]+|[-.]+$/g, "");
+
+  return cleaned || "conversation";
 }
 
 function wordDocumentXml(input: Pick<ExportInput, "title" | "messages">): string {
@@ -268,10 +371,6 @@ function concat(chunks: Uint8Array[]): Uint8Array {
     offset += chunk.length;
   }
   return output;
-}
-
-function pdfText(value: string): string {
-  return `(${value.replace(/[()\\]/g, "\\$&")})`;
 }
 
 function escapeHtml(value: string): string {

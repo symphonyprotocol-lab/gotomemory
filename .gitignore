@@ -29,3 +29,7 @@ __pycache__/
 # OS / editor
 .DS_Store
 *.log
+
+# Server-side deploy state: the running image tag (written by the deploy job)
+# and the signed selector document, which is published out of band.
+deploy/selector-config/

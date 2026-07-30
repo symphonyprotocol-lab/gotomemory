@@ -1,0 +1,44 @@
+name: frozen-nightly
+
+# Nightly checks for the frozen advanced layer (monorepo spec §13):
+# packages/sync, packages/sdk-ts, apps/cli, apps/mcp-server, py/sdk.
+# These are excluded from the default CI matrix; this job keeps them from rotting.
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frozen-ts:
+    name: Frozen TS packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build:frozen
+      - run: pnpm run typecheck:frozen
+      - run: pnpm run lint:frozen
+      - run: pnpm run test:frozen
+
+  frozen-py:
+    name: Frozen Python SDK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: py
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync
+      - run: uv run ruff check .
+      - run: uv run mypy sdk/src
+      - run: uv run pytest -q
