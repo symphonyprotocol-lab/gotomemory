@@ -21,16 +21,21 @@ import type { KeyValueStore } from "./kv.js";
  */
 export const SELECTOR_OVERRIDES_URL = "https://config.gotomemory.dev/selector-overrides.v1.json";
 
-// Release ops: replace with the real production public key before shipping —
-// generate it with `pnpm --filter @gotomemory/selector-signing run keygen`
-// (see tooling/selector-signing/README.md for the full runbook). With this
-// placeholder every fetched config fails verification, so the extension simply
-// keeps its built-in selectors.
+/**
+ * Production verification key for the override channel. Public half only — it
+ * ships inside every installed extension, which is the point: the private half
+ * stays offline (`tooling/selector-signing/selector-signing-key.json`, which is
+ * git-ignored) and is the only thing that can mint a document this accepts.
+ *
+ * Rotating it is a store release, not a config push: extensions verify against
+ * the key compiled into them, so a new key only takes effect once users update.
+ * Publish documents signed with the *old* key until that rollout completes.
+ */
 export const SELECTOR_OVERRIDES_PUBLIC_KEY: JsonWebKey = {
   kty: "EC",
   crv: "P-256",
-  x: "PLACEHOLDER-REPLACE-AT-RELEASE",
-  y: "PLACEHOLDER-REPLACE-AT-RELEASE"
+  x: "UH0SvIfedht4OIIgxyH9UBGzotX0UjAWuMTEAgyJt-A",
+  y: "cmfBMRAq9XUvg2B7Mbj606NLlmTBBWJp6VOf4MZL3_I"
 };
 
 export const SELECTOR_OVERRIDES_KEY = "gotomemory:selector-overrides";

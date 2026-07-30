@@ -40,8 +40,11 @@
   - Implemented in `tooling/selector-signing` (`keygen` / `sign` scripts + README).
   - Covered by `tooling/selector-signing/src/signing.test.ts` (round-trip through the
     extension's real `verifySignedSelectorOverrides`, tamper/wrong-key rejection).
-  - _Still open (ops): run keygen for production, replace the placeholder key in
-    `apps/extension/src/selector-config.ts`, stand up config.gotomemory.dev._
+  - Production key generated and wired into `apps/extension/src/selector-config.ts`;
+    the private half stays offline (git-ignored, never in the repo).
+  - _Still open (ops): stand up config.gotomemory.dev with a published document when a
+    platform redesign first requires one — an empty document cannot be signed, so there
+    is nothing to publish until then._
 - [x] Pre-merge CI: `.github/workflows/ci.yml` runs check + tests + build + real
       `wxt build` + store `zip` (artifact uploaded) on every push/PR — previously the
       only workflows were nightly.
@@ -84,8 +87,8 @@
 - [x] Remote selector overrides: built-in defaults + signed selector-only JSON config fetched
       by background; selector strings only, never code. (monorepo §7)
   - Implemented in `packages/site-adapters/src/overrides.ts` (sanitize/verify/apply, ECDSA
-    P-256), `apps/extension/src/selector-config.ts` (fetch/verify/persist; placeholder public
-    key must be replaced at release), background refresh on service-worker start, and
+    P-256), `apps/extension/src/selector-config.ts` (fetch/verify/persist against the
+    production public key), background refresh on service-worker start, and
     content-script application in `apps/extension/src/mount.ts`.
   - Covered by `packages/site-adapters/src/overrides.test.ts`, `src/index.test.ts`, and
     `apps/extension/src/messaging.test.ts` / `mount.test.ts`.

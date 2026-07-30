@@ -72,10 +72,35 @@ pnpm --filter @gotomemory/selector-signing run sign -- --version <n> ...
 scp selector-overrides.v1.json <user>@<host>:/opt/gotomemory/selector-config/
 ```
 
-See `tooling/selector-signing/README.md` for the signing runbook. Until
-`SELECTOR_OVERRIDES_PUBLIC_KEY` in `apps/extension/src/selector-config.ts` holds
-a real key, every document fails verification and extensions keep their built-in
-selectors — so publishing one has no effect yet.
+See `tooling/selector-signing/README.md` for the signing runbook.
+`SELECTOR_OVERRIDES_PUBLIC_KEY` in `apps/extension/src/selector-config.ts` now
+holds the real key, so a signed document takes effect within one refresh
+interval — at most six hours per install.
+
+Two things the signing tool enforces, worth knowing before you need it in a
+hurry:
+
+- **`--version` must increase on every publish.** Extensions refuse anything at
+  or below the highest version they have already accepted, so a re-used number
+  is silently ignored.
+- **An empty overrides document cannot be signed.** The tool rejects `{}`, so
+  there is no "bootstrap" document to publish — the first document you ever sign
+  is a real hot-fix.
+
+### Publishing nothing is the normal state
+
+| Path                          | Response                                            |
+| ----------------------------- | --------------------------------------------------- |
+| `/`                           | `200 {"service":"…","status":"ok"}` — liveness only |
+| `/selector-overrides.v1.json` | `404` until a document is uploaded, then `200`      |
+| anything else                 | `404`                                               |
+
+**A 404 on the document path is not a fault, and not a gap to fill.** It is the
+steady state: while the built-in selectors work there is nothing to override, and
+the extension treats a 404 as "keep the built-in selectors". You publish a
+document when a site's DOM changes, and remove it once a released version carries
+the fix. The root path exists so that this state does not look like an outage
+when someone opens the hostname.
 
 ## Rolling back
 
