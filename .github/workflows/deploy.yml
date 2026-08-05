@@ -7,6 +7,14 @@
 #
 # Trade-off to know about: if ci.yml is renamed, or is skipped for a commit, no
 # deploy fires and nothing complains. Use the manual run below in that case.
+#
+# Reacting to `workflow_run` also means reacting to ci runs from fork pull
+# requests, and this repo is public, which is why the publish job's `if` is as
+# specific as it is — read the comment there before loosening it.
+#
+# Who can ship: the `DEPLOY_OWNER` repository variable holds the one account
+# allowed to trigger a production deploy. Unset it and nothing deploys, which
+# is the right way for this to fail.
 
 name: deploy
 
@@ -33,11 +41,41 @@ concurrency:
 
 jobs:
   publish:
-    # A manual run deploys whatever ref was asked for; an automatic one only
-    # proceeds when the CI run it is reacting to actually passed.
+    # Production ships only when DEPLOY_OWNER asked for it, one way or another.
+    #
+    # A manual run deploys whatever ref was asked for. `workflow_dispatch`
+    # already needs write access on the repo, and the actor check narrows that
+    # from "any collaborator" to one person.
+    #
+    # An automatic run has to clear four checks, because this repo is public
+    # and `ci` also runs on pull requests, including ones from forks. A
+    # `workflow_run` job gets the real secrets even when the run that triggered
+    # it did not, so an unguarded reaction to "some ci run finished" would hand
+    # DEPLOY_SSH_KEY to whatever commit that run was built from:
+    #   conclusion  — the suite it is reacting to actually passed.
+    #   event       — it was a push to main, not a pull request. This is the
+    #                 load-bearing one against forks: `branches: [main]` above
+    #                 filters on the *head* branch, which for a fork PR is the
+    #                 contributor's own branch name, so a fork branch called
+    #                 `main` satisfies it. Pushing to this repo's main needs
+    #                 write access.
+    #   head_repo   — the commit came from this repo, not from a fork.
+    #   actor       — DEPLOY_OWNER is the one who pushed it.
+    #
+    # Consequence to know about: if another collaborator merges to main, CI
+    # runs and no deploy follows, silently. That is the intended behaviour —
+    # ship it yourself with the manual run above.
+    #
+    # This check stops an unwanted deploy, not a determined collaborator: write
+    # access includes editing this file. The `production` environment's
+    # required-reviewer rule is the part that cannot be edited away from here.
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
+      (github.event_name == 'workflow_dispatch' &&
+      github.actor == vars.DEPLOY_OWNER) ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.actor.login == vars.DEPLOY_OWNER)
     runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:
